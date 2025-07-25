@@ -1,12 +1,18 @@
+import Layout from "@/components/Layout";
 import React from "react";
-import { Text, View } from "react-native";
+import { StatusBar } from "react-native";
 import "../global.css";
 
 const _layout = () => {
   return (
-    <View>
-      <Text>_layout</Text>
-    </View>
+    <>
+      <Layout />
+      <StatusBar
+        barStyle={"light-content"}
+        backgroundColor="transparent"
+        translucent={true}
+      />
+    </>
   );
 };
 
