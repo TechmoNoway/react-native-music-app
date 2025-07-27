@@ -1,18 +1,18 @@
 export const colors = {
-  primary: "#3b82f6", // Blue for buttons and interactive elements
-  primaryLight: "#60a5fa", // Light blue
-  primaryDark: "#1d4ed8", // Dark blue
-  background: "#000", // Keep original dark background
-  backgroundSecondary: "#1a1a1a", // Dark secondary background
-  backgroundCard: "#1a1a1a", // Card background
-  backgroundOverlay: "rgba(0, 0, 0, 0.9)", // Dark overlay
-  text: "#fff", // Keep white text
-  textMuted: "#9ca3af", // Keep original muted text
+  primary: "#3b82f6",
+  primaryLight: "#60a5fa",
+  primaryDark: "#1d4ed8",
+  background: "#000",
+  backgroundSecondary: "#1a1a1a",
+  backgroundCard: "#1a1a1a",
+  backgroundOverlay: "rgba(0, 0, 0, 0.9)",
+  text: "#fff",
+  textMuted: "#9ca3af",
   textSecondary: "#cbd5e1",
-  icon: "#fff", // Keep white icons
-  border: "#333", // Keep original border color
-  maximumTrackTintColor: "rgba(59, 130, 246, 0.4)", // Blue for progress bars
-  minimumTrackTintColor: "rgba(59, 130, 246, 0.8)", // Blue for progress bars
+  icon: "#fff",
+  border: "#333",
+  maximumTrackTintColor: "rgba(59, 130, 246, 0.4)",
+  minimumTrackTintColor: "rgba(59, 130, 246, 0.8)",
 };
 
 export const fontSize = {
