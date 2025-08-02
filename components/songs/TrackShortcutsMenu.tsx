@@ -62,7 +62,7 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
 
   return (
     <>
-      <TouchableOpacity onLongPress={() => setModalVisible(true)}>
+      <TouchableOpacity onPress={() => setModalVisible(true)}>
         {children}
       </TouchableOpacity>
 

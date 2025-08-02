@@ -1,12 +1,13 @@
+import { TrackShortcutsMenu } from "@/components/songs/TrackShortcutsMenu";
 import { StopPropagation } from "@/components/utils/StopPropagation";
 import { unknownTrackImageUri } from "@/constants/images";
-import { colors, fontSize } from "@/constants/tokens";
+import { colors } from "@/constants/tokens";
 import { useActiveTrack, useIsPlaying } from "@/services/audioService";
 import { Track } from "@/types/audio";
 import { Entypo, Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { ActivityIndicator, Text, TouchableHighlight, View } from "react-native";
-import { TrackShortcutsMenu } from "./TrackShortcutsMenu";
+import LottieView from "lottie-react-native";
+import { Text, TouchableHighlight, View } from "react-native";
 
 export type TracksListItemProps = {
   track: Track;
@@ -26,44 +27,46 @@ export const TracksListItem = ({
       onPress={() => handleTrackSelect(track)}
       underlayColor="rgba(255,255,255,0.1)"
     >
-      <View className="flex-row gap-3.5 items-center pr-5 py-2 bg-black">
+      <View className="flex-row gap-3 items-center px-2 py-2 bg-black">
         <View className="relative">
           <Image
             source={{
               uri: track.artwork ?? unknownTrackImageUri,
             }}
             style={{
-              width: 48,
-              height: 48,
-              borderRadius: 8,
+              width: 56,
+              height: 56,
+              borderRadius: 4,
               opacity: isActiveTrack ? 0.6 : 1,
             }}
             contentFit="cover"
             transition={300}
-            placeholder={{ uri: "https://via.placeholder.com/48x48/333/fff?text=♪" }}
+            placeholder={{ uri: "https://via.placeholder.com/56x56/333/fff?text=♪" }}
             placeholderContentFit="contain"
             cachePolicy="memory-disk"
           />
 
           {isActiveTrack &&
             (playing ? (
-              <ActivityIndicator
+              <LottieView
+                source={require("../../assets/LineScaleParty.json")}
+                autoPlay
+                loop
+                resizeMode="contain"
                 style={{
                   position: "absolute",
-                  top: 18,
-                  left: 16,
-                  width: 16,
-                  height: 16,
+                  top: -4,
+                  left: -4,
+                  width: 64,
+                  height: 64,
                 }}
-                size="small"
-                color={colors.icon}
               />
             ) : (
               <Ionicons
                 style={{
                   position: "absolute",
-                  top: 14,
-                  left: 14,
+                  top: 16,
+                  left: 16,
                 }}
                 name="play"
                 size={24}
@@ -74,14 +77,14 @@ export const TracksListItem = ({
 
         <View className="flex-1 flex-row justify-between items-center">
           {/* Track title + artist */}
-          <View style={{ width: "100%" }}>
+          <View style={{ flex: 1 }}>
             <Text
               numberOfLines={1}
               style={{
-                fontSize: fontSize.sm,
-                fontWeight: "600",
-                maxWidth: "90%",
-                color: isActiveTrack ? colors.primary : colors.text,
+                fontSize: 16,
+                fontWeight: "500",
+                color: isActiveTrack ? "#3b82f6" : "#fff",
+                marginBottom: 2,
               }}
             >
               {track.title}
@@ -91,9 +94,8 @@ export const TracksListItem = ({
               <Text
                 numberOfLines={1}
                 style={{
-                  color: colors.textMuted,
+                  color: "rgba(255,255,255,0.7)",
                   fontSize: 14,
-                  marginTop: 4,
                 }}
               >
                 {track.artist}
@@ -103,7 +105,11 @@ export const TracksListItem = ({
 
           <StopPropagation>
             <TrackShortcutsMenu track={track}>
-              <Entypo name="dots-three-horizontal" size={18} color={colors.icon} />
+              <Entypo
+                name="dots-three-vertical"
+                size={18}
+                color="rgba(255,255,255,0.7)"
+              />
             </TrackShortcutsMenu>
           </StopPropagation>
         </View>
