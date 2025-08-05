@@ -2,11 +2,13 @@ import { configureStore } from "@reduxjs/toolkit";
 import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux";
 import libraryReducer from "./librarySlice";
 import queueReducer from "./queueSlice";
+import userReducer from "./userSlice";
 
 export const store = configureStore({
   reducer: {
     library: libraryReducer,
     queue: queueReducer,
+    user: userReducer,
   },
 });
 
