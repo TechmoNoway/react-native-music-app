@@ -1,9 +1,17 @@
-import { useAppDispatch } from "@/store";
-import { login } from "@/store/userSlice";
+import { useUser } from "@/store/hooks";
+import { storage, StorageKeys } from "@/utils/storage";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { Pressable, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
@@ -28,25 +36,181 @@ const GoogleIcon = () => (
   </Svg>
 );
 
+const FacebookIcon = () => (
+  <Svg width="24" height="24" viewBox="0 0 24 24">
+    <Path
+      d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"
+      fill="#1877F2"
+    />
+  </Svg>
+);
+
 export default function LoginScreen() {
   const router = useRouter();
-  const dispatch = useAppDispatch();
+  const { loginWithUserData } = useUser();
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleNavigateToOnboarding = () => {
-    router.push("/onboarding");
+  useEffect(() => {
+    loadSavedCredentials();
+  }, []);
+
+  const loadSavedCredentials = async () => {
+    try {
+      const savedCredentials = await storage.getItem(StorageKeys.USER_CREDENTIALS);
+      const rememberMeStatus = await storage.getItem(StorageKeys.REMEMBER_ME);
+
+      if (savedCredentials && rememberMeStatus) {
+        setUsernameOrEmail(savedCredentials.usernameOrEmail || "");
+        setPassword(savedCredentials.password || "");
+        setRememberMe(true);
+      }
+    } catch (error) {
+      console.error("Error loading saved credentials:", error);
+    }
   };
 
-  const handleLogin = () => {
-    if (!usernameOrEmail || !password) {
-      setError("Please enter both username/email and password.");
+  const handleNavigateToSignUp = () => {
+    if (!isLoading) {
+      router.push("/sign-up");
+    }
+  };
+
+  const validateInput = () => {
+    if (!usernameOrEmail.trim()) {
+      setError("Please enter your email or username.");
+      return false;
+    }
+
+    if (!password.trim()) {
+      setError("Please enter your password.");
+      return false;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleLogin = async () => {
+    if (!validateInput()) {
       return;
     }
 
-    dispatch(login({ usernameOrEmail, password }));
+    setIsLoading(true);
+    setError("");
+
+    try {
+      // Simulate API call with realistic delay
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+
+      const userData = {
+        id: Date.now(),
+        usernameOrEmail: usernameOrEmail.trim(),
+        name: usernameOrEmail.includes("@")
+          ? usernameOrEmail.split("@")[0]
+          : usernameOrEmail.trim(),
+        email: usernameOrEmail.includes("@")
+          ? usernameOrEmail.trim()
+          : `${usernameOrEmail.trim()}@example.com`,
+        loginTime: new Date().toISOString(),
+        loginMethod: "email",
+      };
+
+      // Save user data
+      await storage.setItem(StorageKeys.USER_DATA, userData);
+
+      // Save credentials if remember me is checked
+      if (rememberMe) {
+        await storage.setItem(StorageKeys.USER_CREDENTIALS, {
+          usernameOrEmail: usernameOrEmail.trim(),
+          password: password.trim(),
+        });
+        await storage.setItem(StorageKeys.REMEMBER_ME, true);
+      } else {
+        await storage.removeItem(StorageKeys.USER_CREDENTIALS);
+        await storage.removeItem(StorageKeys.REMEMBER_ME);
+      }
+
+      // Dispatch login với user data hoàn chỉnh
+      loginWithUserData(userData);
+
+      // Navigate to main app
+      // router.replace("/(tabs)");
+    } catch (error) {
+      console.error("Login error:", error);
+      setError("Login failed. Please check your credentials and try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const userData = {
+        id: Date.now(),
+        name: "Google User",
+        email: "googleuser@gmail.com",
+        loginMethod: "google",
+        loginTime: new Date().toISOString(),
+      };
+
+      await storage.setItem(StorageKeys.USER_DATA, userData);
+      loginWithUserData(userData);
+      // router.replace("/(tabs)");
+    } catch (error) {
+      console.error("Google login error:", error);
+      setError("Google login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFacebookLogin = async () => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const userData = {
+        id: Date.now(),
+        name: "Facebook User",
+        email: "facebookuser@facebook.com",
+        loginMethod: "facebook",
+        loginTime: new Date().toISOString(),
+      };
+
+      await storage.setItem(StorageKeys.USER_DATA, userData);
+      loginWithUserData(userData);
+      router.replace("/(tabs)/(songs)");
+    } catch (error) {
+      console.error("Facebook login error:", error);
+      setError("Facebook login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotPassword = () => {
+    if (!isLoading) {
+      Alert.alert(
+        "Forgot Password",
+        "Password reset functionality will be implemented soon.",
+        [{ text: "OK", style: "default" }]
+      );
+    }
   };
 
   return (
@@ -71,7 +235,14 @@ export default function LoginScreen() {
             className="border border-gray-300 rounded-full px-6 py-4 text-base text-black"
             placeholderTextColor="#888"
             value={usernameOrEmail}
-            onChangeText={setUsernameOrEmail}
+            onChangeText={(text) => {
+              setUsernameOrEmail(text);
+              if (error) setError("");
+            }}
+            editable={!isLoading}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="email-address"
           />
         </View>
 
@@ -83,7 +254,13 @@ export default function LoginScreen() {
             className="border border-gray-300 rounded-full px-6 py-4 text-base text-black"
             placeholderTextColor="#888"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (error) setError("");
+            }}
+            editable={!isLoading}
+            autoCapitalize="none"
+            autoCorrect={false}
           />
         </View>
 
@@ -91,32 +268,47 @@ export default function LoginScreen() {
         <View className="flex-row justify-between items-center mb-8">
           <TouchableOpacity
             className="flex-row items-center"
-            onPress={() => setRememberMe(!rememberMe)}
+            onPress={() => !isLoading && setRememberMe(!rememberMe)}
+            disabled={isLoading}
           >
             <View
-              className={`w-4 h-4 border border-gray-400 mr-2 ${
-                rememberMe ? "bg-blue-500" : "bg-white"
+              className={`w-4 h-4 border-2 mr-2 items-center justify-center ${
+                rememberMe ? "bg-blue-500 border-blue-500" : "bg-white border-gray-400"
               }`}
             >
               {rememberMe && <Ionicons name="checkmark" size={12} color="white" />}
             </View>
-            <Text className="text-black text-sm">Remember me</Text>
+            <Text className={`text-sm ${isLoading ? "text-gray-400" : "text-black"}`}>
+              Remember me
+            </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity>
-            <Text className="text-blue-500 text-sm">Forgot Your Password?</Text>
+          <TouchableOpacity onPress={handleForgotPassword} disabled={isLoading}>
+            <Text className={`text-sm ${isLoading ? "text-gray-400" : "text-blue-500"}`}>
+              Forgot Your Password?
+            </Text>
           </TouchableOpacity>
         </View>
 
         {/* Error Message */}
-        {error ? <Text className="text-red-500 text-center mb-4">{error}</Text> : null}
+        {error ? (
+          <View className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+            <Text className="text-red-600 text-center text-sm">{error}</Text>
+          </View>
+        ) : null}
 
         {/* Sign In Button */}
         <Pressable
-          className="bg-blue-500 py-4 rounded-full items-center mb-8"
+          className={`py-4 rounded-full items-center mb-8 flex-row justify-center ${
+            isLoading ? "bg-blue-300" : "bg-blue-500"
+          }`}
           onPress={handleLogin}
+          disabled={isLoading}
         >
-          <Text className="text-white font-bold text-lg">Sign in</Text>
+          {isLoading && <ActivityIndicator size="small" color="white" className="mr-2" />}
+          <Text className="text-white font-bold text-lg">
+            {isLoading ? "Signing in..." : "Sign in"}
+          </Text>
         </Pressable>
 
         {/* Or Section */}
@@ -127,14 +319,26 @@ export default function LoginScreen() {
             <View className="flex-1 h-px bg-gray-300" />
           </View>
 
-          {/* Google and Apple Icons */}
+          {/* Google and Facebook Icons */}
           <View className="flex-row items-center justify-center space-x-6">
-            <TouchableOpacity className="w-12 h-12 bg-white rounded-full items-center justify-center shadow-md border border-gray-200">
+            <TouchableOpacity
+              className={`w-12 h-12 bg-white rounded-full items-center justify-center shadow-md border border-gray-200 ${
+                isLoading ? "opacity-50" : ""
+              }`}
+              onPress={handleGoogleLogin}
+              disabled={isLoading}
+            >
               <GoogleIcon />
             </TouchableOpacity>
 
-            <TouchableOpacity className="w-12 h-12 bg-black rounded-full items-center justify-center shadow-md">
-              <Ionicons name="logo-apple" size={24} color="white" />
+            <TouchableOpacity
+              className={`w-12 h-12 bg-blue-600 rounded-full items-center justify-center shadow-md ${
+                isLoading ? "opacity-50" : ""
+              }`}
+              onPress={handleFacebookLogin}
+              disabled={isLoading}
+            >
+              <FacebookIcon />
             </TouchableOpacity>
           </View>
         </View>
@@ -143,8 +347,12 @@ export default function LoginScreen() {
         <View className="items-center">
           <View className="flex-row items-center justify-center">
             <Text className="text-black text-sm">Don&apos;t have an account? </Text>
-            <TouchableOpacity onPress={handleNavigateToOnboarding}>
-              <Text className="text-blue-500 font-medium text-sm">Sign up</Text>
+            <TouchableOpacity onPress={handleNavigateToSignUp} disabled={isLoading}>
+              <Text
+                className={`font-medium text-sm ${isLoading ? "text-gray-400" : "text-blue-500"}`}
+              >
+                Sign up
+              </Text>
             </TouchableOpacity>
             <Text className="text-black text-sm"> for free!</Text>
           </View>

@@ -10,6 +10,12 @@ export const store = configureStore({
     queue: queueReducer,
     user: userReducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      serializableCheck: {
+        ignoredActions: ["persist/PERSIST"],
+      },
+    }),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

@@ -1,7 +1,6 @@
 import { Artist, Playlist, TrackWithPlaylist } from "@/helpers/types";
 import { Track } from "@/types/audio";
 import { createSelector } from "@reduxjs/toolkit";
-import { RootState, useAppDispatch, useAppSelector } from "./index";
 import {
   addToPlaylist as addToPlaylistAction,
   createPlaylist as createPlaylistAction,
@@ -15,6 +14,7 @@ import {
   clearActiveQueueId,
   setActiveQueueId as setActiveQueueIdAction,
 } from "./queueSlice";
+import { RootState, useAppDispatch, useAppSelector } from "./store";
 import { login as loginAction, logout as logoutAction } from "./userSlice";
 
 const unknownTrackImageUri = "https://via.placeholder.com/300x300?text=Unknown+Track";
@@ -26,7 +26,7 @@ const selectActiveQueueId = (state: RootState) => state.queue.activeQueueId;
 
 const selectFavoriteTracks = createSelector(
   [selectTracks],
-  (tracks: TrackWithPlaylist[]) => tracks.filter((track) => track.rating === 1)
+  (tracks: TrackWithPlaylist[]) => tracks.filter((track) => track.isPublic === true)
 );
 
 const selectArtists = createSelector([selectTracks], (tracks: TrackWithPlaylist[]) => {
@@ -63,7 +63,7 @@ const selectPlaylists = createSelector(
             name: playlistName,
             tracks: [track],
             artworkPreview:
-              (metadata?.customImage || track.artwork) ?? unknownTrackImageUri,
+              (metadata?.customImage || track.thumbnailUrl) ?? unknownTrackImageUri,
             isDefault: metadata?.isDefault ?? false,
             customImage: metadata?.customImage,
             description: metadata?.description,
@@ -203,6 +203,10 @@ export const useUser = () => {
     dispatch(loginAction({ usernameOrEmail, password }));
   };
 
+  const loginWithUserData = (userData: any) => {
+    dispatch(loginAction(userData));
+  };
+
   const logout = () => {
     dispatch(logoutAction());
   };
@@ -210,6 +214,7 @@ export const useUser = () => {
   return {
     user,
     login,
+    loginWithUserData,
     logout,
   };
 };
