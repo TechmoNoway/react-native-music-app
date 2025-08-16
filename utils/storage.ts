@@ -3,6 +3,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export const StorageKeys = {
   USER_DATA: "user_data",
   REMEMBER_ME: "remember_me",
+  AUTH_TOKEN: "auth_token",
+  REFRESH_TOKEN: "refresh_token",
   USER_CREDENTIALS: "user_credentials",
   RECENTLY_PLAYED: "recently_played",
   FAVORITES: "favorites",

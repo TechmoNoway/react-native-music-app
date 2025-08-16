@@ -1,12 +1,26 @@
-// Types for audio functionality using expo-av
+export interface Artist {
+  _id: string;
+  name: string;
+  imageUrl?: string;
+}
 
 export interface Track {
-  url: string;
-  title?: string;
-  artist?: string;
-  artwork?: string;
-  duration?: number;
+  _id: string;
+  title: string;
+  artist: Artist;
+  duration: number;
+  genre: string;
+  fileUrl: string;
+  thumbnailUrl: string;
+  lyrics?: string | null;
+  isPublic: boolean;
+  playCount: number;
+  uploadedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  url?: string;
   rating?: number;
+  playlist?: string[];
 }
 
 export interface AVStatus {

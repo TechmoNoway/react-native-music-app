@@ -1,21 +1,87 @@
 import library from "@/assets/data/library.json";
 import { PlaylistMetadata, TrackWithPlaylist } from "@/helpers/types";
+import { playlistService } from "@/services/playlistService";
+import { PlaylistApiResponse } from "@/types/api";
 import { Track } from "@/types/audio";
-import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
+
+const transformLegacyTrack = (legacyTrack: any): TrackWithPlaylist => ({
+  _id: `legacy_${Date.now()}_${Math.random()}`,
+  title: legacyTrack.title,
+  artist: {
+    _id: `artist_${Date.now()}`,
+    name: legacyTrack.artist,
+  },
+  duration: 0,
+  genre: "Unknown",
+  fileUrl: legacyTrack.url,
+  thumbnailUrl: legacyTrack.artwork,
+  lyrics: undefined,
+  isPublic: true,
+  playCount: 0,
+  uploadedBy: "unknown",
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  rating: undefined,
+  playlist: [],
+});
+
+// Async thunks for API integration
+export const fetchUserPlaylists = createAsyncThunk(
+  "library/fetchUserPlaylists",
+  async (filters?: { type?: string; search?: string }) => {
+    const response = await playlistService.getUserPlaylists(filters);
+    return response;
+  }
+);
+
+export const createPlaylistAsync = createAsyncThunk(
+  "library/createPlaylist",
+  async (playlistData: {
+    name: string;
+    description?: string;
+    coverImageUrl?: string;
+  }) => {
+    const response = await playlistService.createPlaylist(playlistData);
+    return response.playlist;
+  }
+);
+
+export const addSongToPlaylistAsync = createAsyncThunk(
+  "library/addSongToPlaylist",
+  async ({ playlistId, songId }: { playlistId: string; songId: string }) => {
+    const response = await playlistService.addSongToPlaylist(playlistId, { songId });
+    return response.playlist;
+  }
+);
+
+export const toggleTrackFavoriteAsync = createAsyncThunk(
+  "library/toggleTrackFavorite",
+  async (track: Track) => {
+    const response = await playlistService.addToLikedSongs(track);
+    return { track, playlist: response.playlist };
+  }
+);
 
 interface LibraryState {
   tracks: TrackWithPlaylist[];
   playlistsMetadata: PlaylistMetadata[];
+  apiPlaylists: PlaylistApiResponse[];
+  loading: boolean;
+  error: string | null;
 }
 
 const initialState: LibraryState = {
-  tracks: library,
+  tracks: library.map(transformLegacyTrack),
   playlistsMetadata: [
     {
       name: "Liked Songs",
       isDefault: true,
     },
   ],
+  apiPlaylists: [],
+  loading: false,
+  error: null,
 };
 
 const librarySlice = createSlice({
@@ -33,13 +99,11 @@ const librarySlice = createSlice({
         const isLiked = currentPlaylists.includes("Liked Songs");
 
         if (isLiked) {
-          // Remove from Liked Songs
           state.tracks[trackIndex].playlist = currentPlaylists.filter(
             (playlist) => playlist !== "Liked Songs"
           );
           state.tracks[trackIndex].rating = 0;
         } else {
-          // Add to Liked Songs
           state.tracks[trackIndex].playlist = [...currentPlaylists, "Liked Songs"];
           state.tracks[trackIndex].rating = 1;
         }
@@ -71,7 +135,6 @@ const librarySlice = createSlice({
     ) => {
       const { name, customImage, description } = action.payload;
 
-      // Check if playlist already exists
       const existingPlaylist = state.playlistsMetadata.find(
         (playlist) => playlist.name.toLowerCase() === name.toLowerCase()
       );
@@ -88,15 +151,12 @@ const librarySlice = createSlice({
     deletePlaylist: (state, action: PayloadAction<string>) => {
       const playlistName = action.payload;
 
-      // Don't allow deleting default playlists
       const playlist = state.playlistsMetadata.find((p) => p.name === playlistName);
       if (playlist && !playlist.isDefault) {
-        // Remove playlist metadata
         state.playlistsMetadata = state.playlistsMetadata.filter(
           (p) => p.name !== playlistName
         );
 
-        // Remove tracks from this playlist
         state.tracks.forEach((track) => {
           if (track.playlist) {
             track.playlist = track.playlist.filter((p) => p !== playlistName);
@@ -110,13 +170,10 @@ const librarySlice = createSlice({
     ) => {
       const { oldName, newName } = action.payload;
 
-      // Don't allow renaming default playlists
       const playlist = state.playlistsMetadata.find((p) => p.name === oldName);
       if (playlist && !playlist.isDefault) {
-        // Update playlist metadata
         playlist.name = newName;
 
-        // Update tracks
         state.tracks.forEach((track) => {
           if (track.playlist) {
             const index = track.playlist.indexOf(oldName);
@@ -150,6 +207,123 @@ const librarySlice = createSlice({
       }
     },
   },
+  extraReducers: (builder) => {
+    // Fetch user playlists
+    builder
+      .addCase(fetchUserPlaylists.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchUserPlaylists.fulfilled, (state, action) => {
+        state.loading = false;
+        state.apiPlaylists = action.payload.playlists;
+
+        // Update local playlists metadata from API response
+        const apiPlaylistsMetadata: PlaylistMetadata[] = action.payload.playlists.map(
+          (p) => ({
+            name: p.name,
+            customImage: p.coverImageUrl,
+            description: p.description,
+            isDefault: p.isDefault,
+          })
+        );
+
+        state.playlistsMetadata = apiPlaylistsMetadata;
+      })
+      .addCase(fetchUserPlaylists.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || "Failed to fetch playlists";
+      });
+
+    // Create playlist
+    builder
+      .addCase(createPlaylistAsync.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(createPlaylistAsync.fulfilled, (state, action) => {
+        state.loading = false;
+
+        // Add the new playlist to the API playlists array
+        state.apiPlaylists.push(action.payload);
+
+        // Add to local metadata
+        state.playlistsMetadata.push({
+          name: action.payload.name,
+          customImage: action.payload.coverImageUrl,
+          description: action.payload.description,
+          isDefault: action.payload.isDefault,
+        });
+      })
+      .addCase(createPlaylistAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || "Failed to create playlist";
+      });
+
+    // Add song to playlist
+    builder
+      .addCase(addSongToPlaylistAsync.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(addSongToPlaylistAsync.fulfilled, (state, action) => {
+        state.loading = false;
+
+        // Update the playlist in apiPlaylists
+        const playlistIndex = state.apiPlaylists.findIndex(
+          (p) => p._id === action.payload._id
+        );
+        if (playlistIndex !== -1) {
+          state.apiPlaylists[playlistIndex] = action.payload;
+        }
+      })
+      .addCase(addSongToPlaylistAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || "Failed to add song to playlist";
+      });
+
+    // Toggle track favorite
+    builder
+      .addCase(toggleTrackFavoriteAsync.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(toggleTrackFavoriteAsync.fulfilled, (state, action) => {
+        state.loading = false;
+
+        // Update the liked songs playlist in apiPlaylists
+        const likedPlaylistIndex = state.apiPlaylists.findIndex(
+          (p) => p.playlistType === "liked"
+        );
+        if (likedPlaylistIndex !== -1) {
+          state.apiPlaylists[likedPlaylistIndex] = action.payload.playlist;
+        }
+
+        // Also update local tracks state for backward compatibility
+        const trackIndex = state.tracks.findIndex(
+          (currentTrack) => currentTrack._id === action.payload.track._id
+        );
+
+        if (trackIndex !== -1) {
+          const currentPlaylists = state.tracks[trackIndex].playlist ?? [];
+          const isLiked = currentPlaylists.includes("Liked Songs");
+
+          if (isLiked) {
+            state.tracks[trackIndex].playlist = currentPlaylists.filter(
+              (playlist) => playlist !== "Liked Songs"
+            );
+            state.tracks[trackIndex].rating = 0;
+          } else {
+            state.tracks[trackIndex].playlist = [...currentPlaylists, "Liked Songs"];
+            state.tracks[trackIndex].rating = 1;
+          }
+        }
+      })
+      .addCase(toggleTrackFavoriteAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || "Failed to toggle favorite";
+      });
+  },
 });
 
 export const {
@@ -161,4 +335,5 @@ export const {
   updatePlaylistImage,
   updatePlaylistDescription,
 } = librarySlice.actions;
+
 export default librarySlice.reducer;

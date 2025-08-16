@@ -1,12 +1,21 @@
-import { Artist, Playlist, TrackWithPlaylist } from "@/helpers/types";
+import {
+  ArtistWithTracks,
+  Playlist,
+  TrackWithPlaylist,
+  convertApiPlaylistToPlaylist,
+} from "@/helpers/types";
 import { Track } from "@/types/audio";
 import { createSelector } from "@reduxjs/toolkit";
 import {
+  addSongToPlaylistAsync,
   addToPlaylist as addToPlaylistAction,
   createPlaylist as createPlaylistAction,
+  createPlaylistAsync,
   deletePlaylist as deletePlaylistAction,
+  fetchUserPlaylists,
   renamePlaylist as renamePlaylistAction,
   toggleTrackFavorite as toggleTrackFavoriteAction,
+  toggleTrackFavoriteAsync,
   updatePlaylistDescription as updatePlaylistDescriptionAction,
   updatePlaylistImage as updatePlaylistImageAction,
 } from "./librarySlice";
@@ -23,6 +32,9 @@ const unknownTrackImageUri = "https://via.placeholder.com/300x300?text=Unknown+T
 const selectTracks = (state: RootState) => state.library.tracks;
 const selectPlaylistsMetadata = (state: RootState) => state.library.playlistsMetadata;
 const selectActiveQueueId = (state: RootState) => state.queue.activeQueueId;
+const selectApiPlaylists = (state: RootState) => state.library.apiPlaylists;
+const selectLibraryLoading = (state: RootState) => state.library.loading;
+const selectLibraryError = (state: RootState) => state.library.error;
 
 const selectFavoriteTracks = createSelector(
   [selectTracks],
@@ -30,20 +42,23 @@ const selectFavoriteTracks = createSelector(
 );
 
 const selectArtists = createSelector([selectTracks], (tracks: TrackWithPlaylist[]) => {
-  return tracks.reduce((acc: Artist[], track: TrackWithPlaylist) => {
-    const existingArtist = acc.find((artist: Artist) => artist.name === track.artist);
+  return tracks.reduce((acc: ArtistWithTracks[], track: TrackWithPlaylist) => {
+    const artistName = track.artist?.name ?? "Unknown";
+    const existingArtist = acc.find(
+      (artist: ArtistWithTracks) => artist.name === artistName
+    );
 
     if (existingArtist) {
       existingArtist.tracks.push(track);
     } else {
       acc.push({
-        name: track.artist ?? "Unknown",
+        name: artistName,
         tracks: [track],
       });
     }
 
     return acc;
-  }, [] as Artist[]);
+  }, [] as ArtistWithTracks[]);
 });
 
 const selectPlaylists = createSelector(
@@ -109,6 +124,11 @@ const selectPlaylists = createSelector(
     }
   }
 );
+
+// API Playlists selector that converts to UI format
+const selectApiPlaylistsAsUI = createSelector([selectApiPlaylists], (apiPlaylists) => {
+  return apiPlaylists.map(convertApiPlaylistToPlaylist);
+});
 
 // Hooks
 export const useTracks = () => {
@@ -191,8 +211,69 @@ export const useQueue = () => {
   };
 };
 
-// user
+// API Playlists Hooks
+export const useApiPlaylists = () => {
+  const dispatch = useAppDispatch();
+  const apiPlaylists = useAppSelector(selectApiPlaylistsAsUI);
+  const loading = useAppSelector(selectLibraryLoading);
+  const error = useAppSelector(selectLibraryError);
 
+  const fetchPlaylists = (filters?: { type?: string; search?: string }) => {
+    dispatch(fetchUserPlaylists(filters));
+  };
+
+  const createPlaylist = (playlistData: {
+    name: string;
+    description?: string;
+    coverImageUrl?: string;
+  }) => {
+    return dispatch(createPlaylistAsync(playlistData));
+  };
+
+  const addSongToPlaylist = (playlistId: string, songId: string) => {
+    return dispatch(addSongToPlaylistAsync({ playlistId, songId }));
+  };
+
+  const toggleFavorite = (track: Track) => {
+    return dispatch(toggleTrackFavoriteAsync(track));
+  };
+
+  return {
+    apiPlaylists,
+    loading,
+    error,
+    fetchPlaylists,
+    createPlaylist,
+    addSongToPlaylist,
+    toggleFavorite,
+  };
+};
+
+// Enhanced favorites hook with API integration
+export const useEnhancedFavorites = () => {
+  const dispatch = useAppDispatch();
+  const favorites = useAppSelector(selectFavoriteTracks);
+  const loading = useAppSelector(selectLibraryLoading);
+
+  // Local toggle for backward compatibility
+  const toggleTrackFavorite = (track: Track) => {
+    dispatch(toggleTrackFavoriteAction(track));
+  };
+
+  // API toggle with backend sync
+  const toggleTrackFavoriteWithApi = (track: Track) => {
+    return dispatch(toggleTrackFavoriteAsync(track));
+  };
+
+  return {
+    favorites,
+    loading,
+    toggleTrackFavorite,
+    toggleTrackFavoriteWithApi,
+  };
+};
+
+// user
 const selectUser = (state: RootState) => state.user;
 
 export const useUser = () => {
