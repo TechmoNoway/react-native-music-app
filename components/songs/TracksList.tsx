@@ -48,7 +48,7 @@ export const TracksList = ({
       try {
         console.log("Processing track selection:", selectedTrack.title);
 
-        const trackIndex = tracks.findIndex((track) => track.url === selectedTrack.url);
+        const trackIndex = tracks.findIndex((track) => track.fileUrl === selectedTrack.fileUrl);
 
         if (trackIndex === -1) {
           console.log("Track not found in list");
@@ -112,20 +112,8 @@ export const TracksList = ({
       ListFooterComponent={ItemDivider}
       ItemSeparatorComponent={ItemDivider}
       ListEmptyComponent={
-        <View className="px-4 py-8">
+        <View className="px-4 py-32">
           <Text className="text-gray-400 text-base text-center">No songs found</Text>
-
-          {/* <Image
-            source={{ uri: unknownTrackImageUri }}
-            style={{
-              width: 200,
-              height: 200,
-              alignSelf: "center",
-              opacity: 0.3,
-              marginTop: 20,
-            }}
-            contentFit="cover"
-          /> */}
         </View>
       }
       renderItem={({ item: track }) => (

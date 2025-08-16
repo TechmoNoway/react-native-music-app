@@ -1,8 +1,8 @@
 import { RepeatMode, Track } from "@/types/audio";
 import { Audio, AVPlaybackStatus } from "expo-av";
 import { useEffect, useState } from "react";
+import { simpleBackgroundService } from "./simpleBackgroundService";
 
-// Audio service using expo-av for real audio playback
 class AudioService {
   private sound: Audio.Sound | null = null;
   private currentTrack: Track | null = null;
@@ -14,6 +14,8 @@ class AudioService {
   private position: number = 0;
   private duration: number = 0;
   private listeners: Map<string, Function[]> = new Map();
+  private isResetting = false;
+  private isAdding = false;
 
   constructor() {
     this.setupAudio();
@@ -53,13 +55,29 @@ class AudioService {
     }
   }
 
-  async add(track: Track | Track[]) {
-    const tracksToAdd = Array.isArray(track) ? track : [track];
-    this.queue.push(...tracksToAdd);
+  async add(tracks: Track | Track[]): Promise<void> {
+    if (this.isAdding) {
+      console.log("Already adding tracks, ignoring...");
+      return;
+    }
 
-    // If this is the first track being added and no track is currently loaded, load it
-    if (this.queue.length === tracksToAdd.length && !this.currentTrack) {
-      await this.loadTrack(this.queue[0]);
+    this.isAdding = true;
+
+    try {
+      const tracksArray = Array.isArray(tracks) ? tracks : [tracks];
+      console.log("Adding tracks:", tracksArray.length);
+
+      this.queue = [...this.queue, ...tracksArray];
+
+      // If this is the first track and no current track, load it
+      if (this.queue.length === tracksArray.length && !this.currentTrack) {
+        const firstTrack = this.queue[0];
+        if (firstTrack) {
+          await this.loadTrack(firstTrack);
+        }
+      }
+    } finally {
+      this.isAdding = false;
     }
   }
 
@@ -72,16 +90,42 @@ class AudioService {
     }
   }
 
-  async reset() {
-    if (this.sound) {
-      await this.sound.unloadAsync();
-      this.sound = null;
+  async reset(): Promise<void> {
+    if (this.isResetting) {
+      console.log("Already resetting, waiting...");
+      return;
     }
-    this.queue = [];
-    this.currentIndex = 0;
-    this.currentTrack = null;
-    this.isPlaying = false;
-    this.position = 0;
+
+    this.isResetting = true;
+    console.log("Resetting AudioService");
+
+    try {
+      // Stop and cleanup current sound
+      if (this.sound) {
+        try {
+          await this.sound.stopAsync();
+          await this.sound.unloadAsync();
+        } catch (error) {
+          console.log("Error during sound cleanup:", error);
+        }
+        this.sound = null;
+      }
+
+      // Reset all state
+      this.queue = [];
+      this.currentIndex = 0;
+      this.currentTrack = null;
+      this.isPlaying = false;
+      this.position = 0;
+      this.duration = 0;
+      this.emit("PlaybackState", { state: "paused" });
+
+      console.log("AudioService reset completed");
+    } catch (error) {
+      console.error("Error during reset:", error);
+    } finally {
+      this.isResetting = false;
+    }
   }
 
   private async loadTrack(track: Track) {
@@ -93,7 +137,7 @@ class AudioService {
       this.currentTrack = track;
 
       const { sound } = await Audio.Sound.createAsync(
-        { uri: track.url },
+        { uri: track.url ?? "" },
         {
           shouldPlay: false,
           volume: this.volume,
@@ -108,6 +152,10 @@ class AudioService {
       await new Promise((resolve) => setTimeout(resolve, 100));
 
       this.emit("PlaybackActiveTrackChanged", { index: this.currentIndex, track });
+
+      // Update background service with progress
+      const progress = this.getProgress();
+      simpleBackgroundService.updatePlaybackState(track, this.isPlaying, progress);
 
       console.log("✅ Track loaded successfully");
     } catch (error) {
@@ -133,25 +181,38 @@ class AudioService {
     }
   };
 
-  async play() {
-    // If no sound is loaded but we have tracks in queue, load the current track first
-    if (!this.sound && this.queue.length > 0) {
-      console.log("🔄 Loading track before playing...");
-      await this.loadTrack(this.queue[this.currentIndex]);
-    }
-
-    if (!this.sound) {
-      console.warn("⚠️ No sound loaded and no tracks in queue");
+  async play(): Promise<void> {
+    if (this.isResetting) {
+      console.log("Cannot play - currently resetting");
       return;
     }
 
     try {
-      console.log("▶️ Playing track:", this.currentTrack?.title);
+      // If no sound but we have tracks, load the current track first
+      if (!this.sound && this.queue.length > 0) {
+        const currentTrack = this.queue[this.currentIndex];
+        if (currentTrack) {
+          await this.loadTrack(currentTrack);
+        }
+      }
+
+      if (!this.sound) {
+        console.log("No sound available to play");
+        return;
+      }
+
+      console.log("Playing track");
       await this.sound.playAsync();
-      console.log("✅ Play command sent successfully");
-      this.emit("RemotePlay", {});
+      this.isPlaying = true;
+      this.emit("PlaybackState", { state: "playing" });
+
+      // Update background service with progress
+      if (this.currentTrack) {
+        const progress = this.getProgress();
+        simpleBackgroundService.updatePlaybackState(this.currentTrack, true, progress);
+      }
     } catch (error) {
-      console.error("❌ Error playing:", error);
+      console.error("Error playing track:", error);
     }
   }
 
@@ -160,7 +221,15 @@ class AudioService {
 
     try {
       await this.sound.pauseAsync();
+      this.isPlaying = false;
+      this.emit("PlaybackState", { state: "paused" });
       this.emit("RemotePause", {});
+
+      // Update background service with progress
+      if (this.currentTrack) {
+        const progress = this.getProgress();
+        simpleBackgroundService.updatePlaybackState(this.currentTrack, false, progress);
+      }
     } catch (error) {
       console.error("Error pausing:", error);
     }
@@ -172,6 +241,9 @@ class AudioService {
     try {
       await this.sound.stopAsync();
       this.emit("RemoteStop", {});
+
+      // Update background service when stopped
+      simpleBackgroundService.updatePlaybackState(null, false);
     } catch (error) {
       console.error("Error stopping:", error);
     }
@@ -325,15 +397,11 @@ class AudioService {
     }
   }
 
-  registerPlaybackService(service: () => any) {
-    // Not needed for expo-av
-  }
+  registerPlaybackService(service: () => any) {}
 }
 
-// Create singleton instance
 export const audioService = new AudioService();
 
-// Export compatible API
 export default {
   setupPlayer: (options?: any) => audioService.setupPlayer(options),
   updateOptions: (options?: any) => audioService.updateOptions(options),
@@ -366,8 +434,6 @@ export default {
   registerPlaybackService: (service: () => any) =>
     audioService.registerPlaybackService(service),
 };
-
-// React hooks for easy integration
 
 export const useProgress = (updateInterval: number = 250) => {
   const [progress, setProgress] = useState({ position: 0, duration: 0 });

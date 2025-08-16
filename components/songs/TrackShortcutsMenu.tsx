@@ -39,7 +39,7 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
           const queue = await AudioService.getQueue();
 
           const trackToRemove = queue.findIndex(
-            (queueTrack: Track) => queueTrack.url === track.url
+            (queueTrack: Track) => queueTrack.fileUrl === track.fileUrl
           );
 
           await AudioService.remove(trackToRemove);
@@ -50,7 +50,7 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
         // it opens the addToPlaylist modal
         router.push({
           pathname: "/(modals)/addToPlaylist",
-          params: { trackUrl: track.url },
+          params: { trackUrl: track.fileUrl },
         });
         break;
 

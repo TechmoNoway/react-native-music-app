@@ -28,7 +28,7 @@ export const FloatingPlayer = ({ style }: ViewProps) => {
       >
         <Image
           source={{
-            uri: displayedTrack.artwork ?? unknownTrackImageUri,
+            uri: displayedTrack.thumbnailUrl ?? unknownTrackImageUri,
           }}
           style={{
             width: 40,

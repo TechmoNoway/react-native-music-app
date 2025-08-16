@@ -20,7 +20,7 @@ export const TracksListItem = ({
 }: TracksListItemProps) => {
   const { playing } = useIsPlaying();
 
-  const isActiveTrack = useActiveTrack()?.url === track.url;
+  const isActiveTrack = useActiveTrack()?.fileUrl === track.fileUrl;
 
   return (
     <TouchableHighlight
@@ -31,7 +31,7 @@ export const TracksListItem = ({
         <View className="relative">
           <Image
             source={{
-              uri: track.artwork ?? unknownTrackImageUri,
+              uri: track.thumbnailUrl ?? unknownTrackImageUri,
             }}
             style={{
               width: 56,
@@ -98,7 +98,7 @@ export const TracksListItem = ({
                   fontSize: 14,
                 }}
               >
-                {track.artist}
+                {typeof track.artist === "string" ? track.artist : track.artist.name}
               </Text>
             )}
           </View>

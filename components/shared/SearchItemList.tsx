@@ -50,7 +50,9 @@ export const TracksList = ({
       try {
         console.log("Processing track selection:", selectedTrack.title);
 
-        const trackIndex = tracks.findIndex((track) => track.url === selectedTrack.url);
+        const trackIndex = tracks.findIndex(
+          (track) => track.fileUrl === selectedTrack.fileUrl
+        );
 
         if (trackIndex === -1) {
           console.log("Track not found in list");
