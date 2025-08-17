@@ -14,13 +14,13 @@ const AddToPlaylistModal = () => {
 
   const { activeQueueId } = useQueue();
 
-  const { trackUrl } = useLocalSearchParams<{ trackUrl: Track["url"] }>();
+  const { trackUrl } = useLocalSearchParams<{ trackUrl: Track["fileUrl"] }>();
 
   const tracks = useTracks();
 
   const { playlists, addToPlaylist } = usePlaylists();
 
-  const track = tracks.find((currentTrack) => trackUrl === currentTrack.url);
+  const track = tracks.find((currentTrack) => trackUrl === currentTrack.fileUrl);
 
   // track was not found
   if (!track) {
@@ -29,7 +29,7 @@ const AddToPlaylistModal = () => {
 
   const availablePlaylists = playlists.filter(
     (playlist) =>
-      !playlist.tracks.some((playlistTrack) => playlistTrack.url === track.url)
+      !playlist.tracks.some((playlistTrack) => playlistTrack.fileUrl === track.fileUrl)
   );
 
   const handlePlaylistPress = async (playlist: Playlist) => {

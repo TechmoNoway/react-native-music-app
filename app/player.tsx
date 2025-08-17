@@ -18,7 +18,7 @@ const PlayerScreen = () => {
   const activeTrack = useActiveTrack();
   const router = useRouter();
   const { imageColors } = usePlayerBackground(
-    activeTrack?.artwork ?? unknownTrackImageUri
+    activeTrack?.thumbnailUrl ?? unknownTrackImageUri
   );
 
   const { top, bottom } = useSafeAreaInsets();
@@ -84,7 +84,7 @@ const PlayerScreen = () => {
           >
             <Image
               source={{
-                uri: activeTrack.artwork ?? unknownTrackImageUri,
+                uri: activeTrack.thumbnailUrl ?? unknownTrackImageUri,
               }}
               contentFit="cover"
               style={{
@@ -134,7 +134,9 @@ const PlayerScreen = () => {
                     numberOfLines={1}
                     className="text-white text-sm font-semibold mt-0.5"
                   >
-                    {activeTrack.artist || "Unknown Artist"}
+                    {(typeof activeTrack.artist === "string"
+                      ? activeTrack.artist
+                      : activeTrack.artist?.name) || "Unknown Artist"}
                   </Text>
                 </View>
 
@@ -177,7 +179,7 @@ const PlayerScreen = () => {
               >
                 <Image
                   source={{
-                    uri: activeTrack.artwork ?? unknownTrackImageUri,
+                    uri: activeTrack.thumbnailUrl ?? unknownTrackImageUri,
                   }}
                   contentFit="cover"
                   style={{
@@ -220,7 +222,9 @@ const PlayerScreen = () => {
                       numberOfLines={1}
                       className="text-white text-base opacity-80 max-w-[90%] mt-1.5"
                     >
-                      {activeTrack.artist}
+                      {typeof activeTrack.artist === "string"
+                        ? activeTrack.artist
+                        : activeTrack.artist.name}
                     </Text>
                   )}
                 </View>

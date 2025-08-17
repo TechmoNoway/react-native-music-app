@@ -1,7 +1,18 @@
+import { useUser } from "@/hooks/useUser";
+import { useUserProfile } from "@/hooks/useUserProfile";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-import { ScrollView, Switch, Text, TouchableOpacity, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../../../constants/tokens";
 
@@ -36,6 +47,37 @@ export default function ProfileScreen() {
   const { top } = useSafeAreaInsets();
   const [darkMode, setDarkMode] = useState(true);
   const router = useRouter();
+  const { user, logout } = useUser();
+  const { profileData, isLoading: isLoadingProfile, fetchProfile } = useUserProfile();
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+      router.replace("/login");
+    } catch (error) {
+      console.error("Error logging out:", error);
+      router.replace("/login");
+    }
+  }, [logout, router]);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user) return;
+
+      try {
+        await fetchProfile();
+      } catch (error) {
+        console.error("Error loading profile:", error);
+        if (error instanceof Error && error.message === "Authentication expired") {
+          Alert.alert("Session Expired", "Please login again.", [
+            { text: "OK", onPress: handleLogout },
+          ]);
+        }
+      }
+    };
+
+    loadProfile();
+  }, [user, handleLogout, fetchProfile]);
 
   const renderProfileItem = (item: any, index: number) => {
     return (
@@ -72,10 +114,6 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleLogout = () => {
-    router.replace("/login");
-  };
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView style={{ flex: 1, paddingTop: top + 25 }}>
@@ -89,24 +127,69 @@ export default function ProfileScreen() {
             borderBottomColor: "#333",
           }}
         >
-          <View
-            style={{
-              width: 96,
-              height: 96,
-              borderRadius: 48,
-              backgroundColor: "#1a1a1a",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 16,
-            }}
-          >
-            <Ionicons name="person" size={40} color={colors.textMuted} />
-          </View>
-          <Text
-            style={{ fontSize: 20, fontWeight: "600", color: "#fff", marginBottom: 4 }}
-          >
-            Music Lover
-          </Text>
+          {isLoadingProfile ? (
+            <ActivityIndicator size="large" color={colors.primary} />
+          ) : (
+            <>
+              <View
+                style={{
+                  width: 96,
+                  height: 96,
+                  borderRadius: 48,
+                  backgroundColor: "#1a1a1a",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 16,
+                  overflow: "hidden",
+                }}
+              >
+                {profileData?.avatar ? (
+                  <Image
+                    source={{ uri: profileData.avatar }}
+                    style={{ width: 96, height: 96, borderRadius: 48 }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Ionicons name="person" size={40} color={colors.textMuted} />
+                )}
+              </View>
+
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "600",
+                  color: "#fff",
+                  marginBottom: 4,
+                }}
+              >
+                {profileData?.name ||
+                  profileData?.username ||
+                  user?.name ||
+                  "Music Lover"}
+              </Text>
+
+              {profileData?.email && (
+                <Text style={{ fontSize: 14, color: colors.textMuted, marginBottom: 8 }}>
+                  {profileData.email}
+                </Text>
+              )}
+
+              {user?.loginMethod && (
+                <View
+                  style={{
+                    backgroundColor: colors.primary,
+                    paddingHorizontal: 12,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
+                    {user.loginMethod.toUpperCase()}
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
         </View>
 
         {/* Settings Sections */}
@@ -148,7 +231,7 @@ export default function ProfileScreen() {
             borderRadius: 12,
             backgroundColor: "#dc2626",
           }}
-          onPress={() => handleLogout()}
+          onPress={handleLogout}
         >
           <Text style={{ textAlign: "center", color: "#fff", fontWeight: "600" }}>
             Sign Out

@@ -8,7 +8,7 @@ export const useTrackPlayerFavorite = () => {
   const { favorites, toggleTrackFavorite } = useFavorites();
 
   const isFavorite =
-    favorites.find((track) => track.url === activeTrack?.url)?.rating === 1;
+    favorites.find((track) => track.fileUrl === activeTrack?.fileUrl)?.rating === 1;
 
   // we're updating both the track player internal state and application internal state
   const toggleFavorite = useCallback(async () => {

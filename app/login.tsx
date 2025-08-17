@@ -1,6 +1,9 @@
-import { useUser } from "@/store/hooks";
+import { API_CONFIG, API_ENDPOINTS, LOGIN_METHODS } from "@/constants/api";
+import { useUser } from "@/hooks/useUser";
+import type { LoginResponse, SocialLoginResponse } from "@/types/api";
 import { storage, StorageKeys } from "@/utils/storage";
 import { Ionicons } from "@expo/vector-icons";
+import axios, { isAxiosError } from "axios";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -107,45 +110,77 @@ export default function LoginScreen() {
     setError("");
 
     try {
-      // Simulate API call with realistic delay
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
-      const userData = {
-        id: Date.now(),
-        usernameOrEmail: usernameOrEmail.trim(),
-        name: usernameOrEmail.includes("@")
-          ? usernameOrEmail.split("@")[0]
-          : usernameOrEmail.trim(),
-        email: usernameOrEmail.includes("@")
-          ? usernameOrEmail.trim()
-          : `${usernameOrEmail.trim()}@example.com`,
-        loginTime: new Date().toISOString(),
-        loginMethod: "email",
-      };
-
-      // Save user data
-      await storage.setItem(StorageKeys.USER_DATA, userData);
-
-      // Save credentials if remember me is checked
-      if (rememberMe) {
-        await storage.setItem(StorageKeys.USER_CREDENTIALS, {
-          usernameOrEmail: usernameOrEmail.trim(),
+      // API call for login
+      const response = await axios.post<LoginResponse>(
+        `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH.LOGIN}`,
+        {
+          login: usernameOrEmail.trim(),
           password: password.trim(),
-        });
-        await storage.setItem(StorageKeys.REMEMBER_ME, true);
+        },
+        {
+          timeout: API_CONFIG.TIMEOUT,
+          headers: API_CONFIG.HEADERS,
+        }
+      );
+
+      if (response.data.success) {
+        const { user, token, refreshToken } = response.data.data!;
+
+        // Create user data object
+        const userData = {
+          id: user.id,
+          name: user.name || user.username,
+          email: user.email,
+          username: user.username,
+          avatar: user.avatar,
+          loginTime: new Date().toISOString(),
+          loginMethod: LOGIN_METHODS.EMAIL,
+        };
+
+        await storage.setItem(StorageKeys.USER_DATA, userData);
+        await storage.setItem(StorageKeys.AUTH_TOKEN, token);
+
+        if (refreshToken) {
+          await storage.setItem(StorageKeys.REFRESH_TOKEN, refreshToken);
+        }
+
+        if (rememberMe) {
+          await storage.setItem(StorageKeys.USER_CREDENTIALS, {
+            usernameOrEmail: usernameOrEmail.trim(),
+            password: password.trim(),
+          });
+          await storage.setItem(StorageKeys.REMEMBER_ME, true);
+        } else {
+          await storage.removeItem(StorageKeys.USER_CREDENTIALS);
+          await storage.removeItem(StorageKeys.REMEMBER_ME);
+        }
+
+        // Login user
+        loginWithUserData(userData);
+
+        // Navigate to profile tab to show user data
+        router.replace("/(tabs)/(songs)");
       } else {
-        await storage.removeItem(StorageKeys.USER_CREDENTIALS);
-        await storage.removeItem(StorageKeys.REMEMBER_ME);
+        setError(response.data.message || "Login failed");
       }
-
-      // Dispatch login với user data hoàn chỉnh
-      loginWithUserData(userData);
-
-      // Navigate to main app
-      // router.replace("/(tabs)");
     } catch (error) {
       console.error("Login error:", error);
-      setError("Login failed. Please check your credentials and try again.");
+
+      if (isAxiosError(error)) {
+        if (error.response) {
+          // Server responded with error
+          const message = error.response.data?.message || "Invalid credentials";
+          setError(message);
+        } else if (error.request) {
+          // Network error
+          setError("Network error. Please check your connection.");
+        } else {
+          // Request setup error
+          setError("Something went wrong. Please try again.");
+        }
+      } else {
+        setError("Login failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -156,22 +191,56 @@ export default function LoginScreen() {
     setError("");
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // You would integrate with Google Sign-In SDK here
+      // For now, making API call with Google token
 
-      const userData = {
-        id: Date.now(),
-        name: "Google User",
-        email: "googleuser@gmail.com",
-        loginMethod: "google",
-        loginTime: new Date().toISOString(),
-      };
+      // Example: Get Google token from Google Sign-In SDK
+      // const googleToken = await GoogleSignIn.signIn();
 
-      await storage.setItem(StorageKeys.USER_DATA, userData);
-      loginWithUserData(userData);
-      // router.replace("/(tabs)");
+      const response = await axios.post<SocialLoginResponse>(
+        `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH.GOOGLE}`,
+        {
+          // googleToken: googleToken.idToken,
+          provider: "google",
+        },
+        {
+          timeout: API_CONFIG.TIMEOUT,
+          headers: API_CONFIG.HEADERS,
+        }
+      );
+
+      if (response.data.success) {
+        const { user, token, refreshToken } = response.data.data!;
+
+        const userData = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar,
+          loginMethod: LOGIN_METHODS.GOOGLE,
+          loginTime: new Date().toISOString(),
+        };
+
+        await storage.setItem(StorageKeys.USER_DATA, userData);
+        await storage.setItem(StorageKeys.AUTH_TOKEN, token);
+
+        if (refreshToken) {
+          await storage.setItem(StorageKeys.REFRESH_TOKEN, refreshToken);
+        }
+
+        loginWithUserData(userData);
+        router.replace("/(tabs)/(songs)");
+      } else {
+        setError(response.data.message || "Google login failed");
+      }
     } catch (error) {
       console.error("Google login error:", error);
-      setError("Google login failed. Please try again.");
+
+      if (isAxiosError(error) && error.response) {
+        setError(error.response.data?.message || "Google login failed");
+      } else {
+        setError("Google login failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -182,22 +251,53 @@ export default function LoginScreen() {
     setError("");
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // You would integrate with Facebook SDK here
+      // For now, making API call with Facebook token
 
-      const userData = {
-        id: Date.now(),
-        name: "Facebook User",
-        email: "facebookuser@facebook.com",
-        loginMethod: "facebook",
-        loginTime: new Date().toISOString(),
-      };
+      const response = await axios.post<SocialLoginResponse>(
+        `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH.FACEBOOK}`,
+        {
+          // facebookToken: facebookToken,
+          provider: "facebook",
+        },
+        {
+          timeout: API_CONFIG.TIMEOUT,
+          headers: API_CONFIG.HEADERS,
+        }
+      );
 
-      await storage.setItem(StorageKeys.USER_DATA, userData);
-      loginWithUserData(userData);
-      router.replace("/(tabs)/(songs)");
+      if (response.data.success) {
+        const { user, token, refreshToken } = response.data.data!;
+
+        const userData = {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          avatar: user.avatar,
+          loginMethod: LOGIN_METHODS.FACEBOOK,
+          loginTime: new Date().toISOString(),
+        };
+
+        await storage.setItem(StorageKeys.USER_DATA, userData);
+        await storage.setItem(StorageKeys.AUTH_TOKEN, token);
+
+        if (refreshToken) {
+          await storage.setItem(StorageKeys.REFRESH_TOKEN, refreshToken);
+        }
+
+        loginWithUserData(userData);
+        router.replace("/(tabs)/(songs)");
+      } else {
+        setError(response.data.message || "Facebook login failed");
+      }
     } catch (error) {
       console.error("Facebook login error:", error);
-      setError("Facebook login failed. Please try again.");
+
+      if (isAxiosError(error) && error.response) {
+        setError(error.response.data?.message || "Facebook login failed");
+      } else {
+        setError("Facebook login failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -205,11 +305,17 @@ export default function LoginScreen() {
 
   const handleForgotPassword = () => {
     if (!isLoading) {
-      Alert.alert(
-        "Forgot Password",
-        "Password reset functionality will be implemented soon.",
-        [{ text: "OK", style: "default" }]
-      );
+      // Show alert for now since forgot password screen doesn't exist
+      Alert.alert("Forgot Password", "You will be redirected to reset your password.", [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Continue",
+          onPress: () => {
+            // For now, just show a message. You can implement forgot password API call here
+            Alert.alert("Coming Soon", "Password reset feature will be available soon.");
+          },
+        },
+      ]);
     }
   };
 

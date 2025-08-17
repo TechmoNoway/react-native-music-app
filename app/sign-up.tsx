@@ -1,9 +1,23 @@
+import { useUser } from "@/store/hooks";
+import { storage, StorageKeys } from "@/utils/storage";
 import { Ionicons } from "@expo/vector-icons";
+import axios from "axios";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { Pressable, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
+
+// Import types and constants
+import { API_CONFIG, API_ENDPOINTS, LOGIN_METHODS } from "@/constants/api";
+import type { RegisterResponse } from "@/types/api";
 
 const GoogleIcon = () => (
   <Svg width="24" height="24" viewBox="0 0 24 24">
@@ -37,23 +51,118 @@ const FacebookIcon = () => (
 
 export default function SignUpScreen() {
   const router = useRouter();
+  const { loginWithUserData } = useUser();
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignUp = () => {
-    if (!email || !password || !confirmPassword) {
-      alert("Please fill in all fields");
-      return;
+  const validateInput = () => {
+    if (!username.trim()) {
+      setError("Please enter a username.");
+      return false;
+    }
+
+    if (!email.trim()) {
+      setError("Please enter your email address.");
+      return false;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError("Please enter a valid email address.");
+      return false;
+    }
+
+    if (!password.trim()) {
+      setError("Please enter your password.");
+      return false;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return false;
     }
 
     if (password !== confirmPassword) {
-      alert("Passwords do not match");
+      setError("Passwords do not match.");
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSignUp = async () => {
+    if (!validateInput()) {
       return;
     }
 
-    router.replace("/(tabs)/(songs)");
+    setIsLoading(true);
+    setError("");
+
+    try {
+      const response = await axios.post<RegisterResponse>(
+        `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH.REGISTER}`,
+        {
+          username: username.trim(),
+          email: email.trim(),
+          password: password.trim(),
+        },
+        {
+          timeout: API_CONFIG.TIMEOUT,
+          headers: API_CONFIG.HEADERS,
+        }
+      );
+
+      if (response.data.success) {
+        const { user, token, refreshToken } = response.data.data!;
+
+        const userData = {
+          id: user.id,
+          name: user.name || user.username,
+          email: user.email,
+          username: user.username,
+          avatar: user.avatar,
+          loginTime: new Date().toISOString(),
+          loginMethod: LOGIN_METHODS.EMAIL,
+        };
+
+        await storage.setItem(StorageKeys.USER_DATA, userData);
+        await storage.setItem(StorageKeys.AUTH_TOKEN, token);
+
+        if (refreshToken) {
+          await storage.setItem(StorageKeys.REFRESH_TOKEN, refreshToken);
+        }
+
+        // Login user
+        loginWithUserData(userData);
+
+        // Navigate to main app
+        router.replace("/(tabs)/(songs)");
+      } else {
+        setError(response.data.message || "Registration failed");
+      }
+    } catch (error) {
+      console.error("Registration error:", error);
+
+      if (axios.isAxiosError(error)) {
+        if (error.response) {
+          const message = error.response.data?.message || "Registration failed";
+          setError(message);
+        } else if (error.request) {
+          setError("Network error. Please check your connection.");
+        } else {
+          setError("Something went wrong. Please try again.");
+        }
+      } else {
+        setError("Registration failed. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleNavigateToLogin = () => {
@@ -84,18 +193,42 @@ export default function SignUpScreen() {
           Enjoy Listening To Music
         </Text>
 
+        {/* Username Input */}
         <View className="mb-4">
           <TextInput
-            placeholder="Email Address or Username"
+            placeholder="Username"
             className="border border-gray-300 rounded-full px-6 py-4 text-base text-black"
             placeholderTextColor="#888"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
+            value={username}
+            onChangeText={(text) => {
+              setUsername(text);
+              if (error) setError("");
+            }}
+            editable={!isLoading}
             autoCapitalize="none"
+            autoCorrect={false}
           />
         </View>
 
+        {/* Email Input */}
+        <View className="mb-4">
+          <TextInput
+            placeholder="Email Address"
+            className="border border-gray-300 rounded-full px-6 py-4 text-base text-black"
+            placeholderTextColor="#888"
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (error) setError("");
+            }}
+            editable={!isLoading}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+
+        {/* Password Input */}
         <View className="mb-4">
           <TextInput
             placeholder="Password"
@@ -103,10 +236,17 @@ export default function SignUpScreen() {
             className="border border-gray-300 rounded-full px-6 py-4 text-base text-black"
             placeholderTextColor="#888"
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (error) setError("");
+            }}
+            editable={!isLoading}
+            autoCapitalize="none"
+            autoCorrect={false}
           />
         </View>
 
+        {/* Confirm Password Input */}
         <View className="mb-6">
           <TextInput
             placeholder="Re Enter Password"
@@ -114,31 +254,55 @@ export default function SignUpScreen() {
             className="border border-gray-300 rounded-full px-6 py-4 text-base text-black"
             placeholderTextColor="#888"
             value={confirmPassword}
-            onChangeText={setConfirmPassword}
+            onChangeText={(text) => {
+              setConfirmPassword(text);
+              if (error) setError("");
+            }}
+            editable={!isLoading}
+            autoCapitalize="none"
+            autoCorrect={false}
           />
         </View>
 
+        {/* Remember Me */}
         <View className="flex-row items-center mb-8">
           <TouchableOpacity
             className="flex-row items-center"
-            onPress={() => setRememberMe(!rememberMe)}
+            onPress={() => !isLoading && setRememberMe(!rememberMe)}
+            disabled={isLoading}
           >
             <View
-              className={`w-4 h-4 border border-gray-400 mr-3 ${
-                rememberMe ? "bg-blue-500" : "bg-white"
+              className={`w-4 h-4 border-2 mr-2 items-center justify-center ${
+                rememberMe ? "bg-blue-500 border-blue-500" : "bg-white border-gray-400"
               }`}
             >
               {rememberMe && <Ionicons name="checkmark" size={12} color="white" />}
             </View>
-            <Text className="text-black text-sm">Remember me</Text>
+            <Text className={`text-sm ${isLoading ? "text-gray-400" : "text-black"}`}>
+              Remember me
+            </Text>
           </TouchableOpacity>
         </View>
 
+        {/* Error Message */}
+        {error ? (
+          <View className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4">
+            <Text className="text-red-600 text-center text-sm">{error}</Text>
+          </View>
+        ) : null}
+
+        {/* Sign Up Button */}
         <Pressable
-          className="bg-blue-500 py-4 rounded-full items-center mb-8"
+          className={`py-4 rounded-full items-center mb-8 flex-row justify-center ${
+            isLoading ? "bg-blue-300" : "bg-blue-500"
+          }`}
           onPress={handleSignUp}
+          disabled={isLoading}
         >
-          <Text className="text-white font-bold text-lg">Sign up</Text>
+          {isLoading && <ActivityIndicator size="small" color="white" className="mr-2" />}
+          <Text className="text-white font-bold text-lg">
+            {isLoading ? "Creating account..." : "Sign up"}
+          </Text>
         </Pressable>
 
         <View className="items-center mb-8">
@@ -148,28 +312,40 @@ export default function SignUpScreen() {
             <View className="flex-1 h-px bg-gray-300" />
           </View>
 
+          {/* Google and Facebook Icons */}
           <View className="flex-row items-center justify-center space-x-6">
             <TouchableOpacity
-              className="w-12 h-12 bg-white rounded-full items-center justify-center shadow-md border border-gray-200"
+              className={`w-12 h-12 bg-white rounded-full items-center justify-center shadow-md border border-gray-200 ${
+                isLoading ? "opacity-50" : ""
+              }`}
               onPress={handleGoogleSignUp}
+              disabled={isLoading}
             >
               <GoogleIcon />
             </TouchableOpacity>
 
             <TouchableOpacity
-              className="w-12 h-12 bg-blue-600 rounded-full items-center justify-center shadow-md"
+              className={`w-12 h-12 bg-blue-600 rounded-full items-center justify-center shadow-md ${
+                isLoading ? "opacity-50" : ""
+              }`}
               onPress={handleFacebookSignUp}
+              disabled={isLoading}
             >
               <FacebookIcon />
             </TouchableOpacity>
           </View>
         </View>
 
+        {/* Sign In Link */}
         <View className="items-center">
           <View className="flex-row items-center justify-center">
             <Text className="text-black text-sm">Already have an account? </Text>
-            <TouchableOpacity onPress={handleNavigateToLogin}>
-              <Text className="text-blue-500 font-medium text-sm underline">
+            <TouchableOpacity onPress={handleNavigateToLogin} disabled={isLoading}>
+              <Text
+                className={`font-medium text-sm ${
+                  isLoading ? "text-gray-400" : "text-blue-500 underline"
+                }`}
+              >
                 Log in now
               </Text>
             </TouchableOpacity>
