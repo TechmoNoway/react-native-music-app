@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Dark theme base styles */
+html {
+    color-scheme: dark;
+}
+
+body {
+    background-color: #000000;
+    color: #ffffff;
+}
