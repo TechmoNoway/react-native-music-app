@@ -2,7 +2,7 @@ import { useUser } from "@/hooks/useUser";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -29,7 +29,6 @@ const profileSections = [
     title: "Preferences",
     items: [
       { icon: "moon-outline", label: "Dark Mode", action: "toggle" },
-      // { icon: "volume-high-outline", label: "Audio Quality", action: "navigate" },
       // { icon: "notifications-outline", label: "Notifications", action: "navigate" },
     ],
   },
@@ -49,6 +48,8 @@ export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout } = useUser();
   const { profileData, isLoading: isLoadingProfile, fetchProfile } = useUserProfile();
+  const hasLoadedProfile = useRef(false);
+  const currentUserId = useRef<string | number | null>(null);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -62,12 +63,21 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      if (!user) return;
+      if (!user || !user.id) return;
 
+      if (currentUserId.current !== user.id) {
+        hasLoadedProfile.current = false;
+        currentUserId.current = user.id;
+      }
+
+      if (hasLoadedProfile.current) return;
+
+      hasLoadedProfile.current = true;
       try {
         await fetchProfile();
       } catch (error) {
         console.error("Error loading profile:", error);
+        hasLoadedProfile.current = false;
         if (error instanceof Error && error.message === "Authentication expired") {
           Alert.alert("Session Expired", "Please login again.", [
             { text: "OK", onPress: handleLogout },
@@ -77,7 +87,7 @@ export default function ProfileScreen() {
     };
 
     loadProfile();
-  }, [user, handleLogout, fetchProfile]);
+  }, [user, fetchProfile, handleLogout]);
 
   const renderProfileItem = (item: any, index: number) => {
     return (
@@ -116,12 +126,12 @@ export default function ProfileScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView style={{ flex: 1, paddingTop: top + 25 }}>
+      <ScrollView style={{ flex: 1, paddingTop: 15 }}>
         {/* User Info Section */}
         <View
           style={{
             paddingHorizontal: 24,
-            paddingVertical: 32,
+            paddingVertical: 40,
             alignItems: "center",
             borderBottomWidth: 1,
             borderBottomColor: "#333",
@@ -133,8 +143,8 @@ export default function ProfileScreen() {
             <>
               <View
                 style={{
-                  width: 96,
-                  height: 96,
+                  width: 110,
+                  height: 110,
                   borderRadius: 48,
                   backgroundColor: "#1a1a1a",
                   alignItems: "center",
@@ -146,8 +156,9 @@ export default function ProfileScreen() {
                 {profileData?.avatar ? (
                   <Image
                     source={{ uri: profileData.avatar }}
-                    style={{ width: 96, height: 96, borderRadius: 48 }}
+                    style={{ width: 110, height: 110 }}
                     resizeMode="cover"
+                    className="rounded-full"
                   />
                 ) : (
                   <Ionicons name="person" size={40} color={colors.textMuted} />
@@ -167,27 +178,6 @@ export default function ProfileScreen() {
                   user?.name ||
                   "Music Lover"}
               </Text>
-
-              {profileData?.email && (
-                <Text style={{ fontSize: 14, color: colors.textMuted, marginBottom: 8 }}>
-                  {profileData.email}
-                </Text>
-              )}
-
-              {user?.loginMethod && (
-                <View
-                  style={{
-                    backgroundColor: colors.primary,
-                    paddingHorizontal: 12,
-                    paddingVertical: 4,
-                    borderRadius: 12,
-                  }}
-                >
-                  <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>
-                    {user.loginMethod.toUpperCase()}
-                  </Text>
-                </View>
-              )}
             </>
           )}
         </View>

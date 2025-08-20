@@ -130,6 +130,14 @@ class AudioService {
 
   private async loadTrack(track: Track) {
     try {
+      // Validate track URL
+      const trackUrl = track.fileUrl || track.url || "";
+      if (!trackUrl || trackUrl.trim() === "") {
+        throw new Error(`No valid audio URL found for track: ${track.title}`);
+      }
+
+      console.log(`🎵 Loading track: ${track.title} from URL: ${trackUrl}`);
+
       if (this.sound) {
         await this.sound.unloadAsync();
       }
@@ -137,7 +145,7 @@ class AudioService {
       this.currentTrack = track;
 
       const { sound } = await Audio.Sound.createAsync(
-        { uri: track.url ?? "" },
+        { uri: trackUrl },
         {
           shouldPlay: false,
           volume: this.volume,
@@ -161,7 +169,18 @@ class AudioService {
     } catch (error) {
       console.error("❌ Error loading track:", error);
       console.error("❌ Error details:", JSON.stringify(error));
-      this.emit("PlaybackError", { error });
+
+      // Show user-friendly error message
+      const trackUrl = track.fileUrl || track.url || "";
+      if (!trackUrl || trackUrl.trim() === "") {
+        console.warn(`⚠️ Track "${track.title}" has no audio file URL`);
+        this.emit("PlaybackError", {
+          error: new Error(`This track "${track.title}" is not available for playback`),
+          type: "NoAudioFile",
+        });
+      } else {
+        this.emit("PlaybackError", { error, type: "PlaybackError" });
+      }
     }
   }
 

@@ -1,19 +1,39 @@
 import { colors } from "@/constants/tokens";
+import {
+  getLikeActionText,
+  getLikeErrorMessage,
+  getLikeLoadingMessage,
+  getLikeSuccessMessage,
+  isTrackLiked,
+} from "@/helpers/trackHelpers";
+import { useUser } from "@/hooks/useUser";
 import AudioService from "@/services/audioService";
+import { playlistService } from "@/services/playlistService";
 import { useFavorites, useQueue } from "@/store/hooks";
 import { Track } from "@/types/audio";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { PropsWithChildren, useState } from "react";
-import { Modal, Pressable, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 type TrackShortcutsMenuProps = PropsWithChildren<{ track: Track }>;
 
 export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps) => {
   const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useUser();
 
-  const isFavorite = track.rating === 1;
+  // Check if current user has liked this song
+  const isFavorite = isTrackLiked(track, user?.id);
 
   const { toggleTrackFavorite } = useFavorites();
   const { activeQueueId } = useQueue();
@@ -21,42 +41,80 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
   const handlePressAction = async (id: string) => {
     setModalVisible(false);
 
-    switch (id) {
-      case "add-to-favorites":
-        toggleTrackFavorite(track);
+    if (isLoading) return; // Prevent multiple simultaneous actions
 
-        // if the tracks is in the favorite queue, add it
-        if (activeQueueId?.startsWith("favorites")) {
-          await AudioService.add(track);
-        }
-        break;
+    try {
+      setIsLoading(true);
 
-      case "remove-from-favorites":
-        toggleTrackFavorite(track);
+      switch (id) {
+        case "add-to-favorites":
+          try {
+            const result = await playlistService.likeSong(track);
 
-        // if the track is in the favorites queue, we need to remove it
-        if (activeQueueId?.startsWith("favorites")) {
-          const queue = await AudioService.getQueue();
+            // Update track's likedBy array locally
+            if (user?.id && track.likedBy) {
+              track.likedBy.push(user.id.toString());
+              track.likesCount = result.likesCount;
+            }
 
-          const trackToRemove = queue.findIndex(
-            (queueTrack: Track) => queueTrack.fileUrl === track.fileUrl
-          );
+            toggleTrackFavorite(track); // Update local state
 
-          await AudioService.remove(trackToRemove);
-        }
-        break;
+            Alert.alert("Success", getLikeSuccessMessage(false), [{ text: "OK" }]);
 
-      case "add-to-playlist":
-        // it opens the addToPlaylist modal
-        router.push({
-          pathname: "/(modals)/addToPlaylist",
-          params: { trackUrl: track.fileUrl },
-        });
-        break;
+            // if the tracks is in the favorite queue, add it
+            if (activeQueueId?.startsWith("favorites")) {
+              await AudioService.add(track);
+            }
+          } catch (error) {
+            console.error("Error adding to favorites:", error);
+            Alert.alert("Error", getLikeErrorMessage(false), [{ text: "OK" }]);
+          }
+          break;
 
-      default:
-        console.warn(`Unknown menu action ${id}`);
-        break;
+        case "remove-from-favorites":
+          try {
+            const result = await playlistService.unlikeSong(track);
+
+            // Update track's likedBy array locally
+            if (user?.id && track.likedBy) {
+              track.likedBy = track.likedBy.filter((id) => id !== user.id.toString());
+              track.likesCount = result.likesCount;
+            }
+
+            toggleTrackFavorite(track); // Update local state
+
+            // if the track is in the favorites queue, we need to remove it
+            if (activeQueueId?.startsWith("favorites")) {
+              const queue = await AudioService.getQueue();
+
+              const trackToRemove = queue.findIndex(
+                (queueTrack: Track) => queueTrack.fileUrl === track.fileUrl
+              );
+
+              await AudioService.remove(trackToRemove);
+            }
+
+            Alert.alert("Success", getLikeSuccessMessage(true), [{ text: "OK" }]);
+          } catch (error) {
+            console.error("Error removing from favorites:", error);
+            Alert.alert("Error", getLikeErrorMessage(true), [{ text: "OK" }]);
+          }
+          break;
+
+        case "add-to-playlist":
+          // it opens the addToPlaylist modal
+          router.push({
+            pathname: "/(modals)/addToPlaylist",
+            params: { trackUrl: track.fileUrl },
+          });
+          break;
+
+        default:
+          console.warn(`Unknown menu action ${id}`);
+          break;
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -65,6 +123,35 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
       <TouchableOpacity onPress={() => setModalVisible(true)}>
         {children}
       </TouchableOpacity>
+
+      {/* Loading overlay for favorites action */}
+      {isLoading && (
+        <Modal animationType="fade" transparent={true} visible={isLoading}>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.7)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: colors.background,
+                padding: 24,
+                borderRadius: 12,
+                alignItems: "center",
+                minWidth: 150,
+              }}
+            >
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={{ color: colors.text, marginTop: 12, textAlign: "center" }}>
+                {getLikeLoadingMessage(isFavorite)}
+              </Text>
+            </View>
+          </View>
+        </Modal>
+      )}
 
       <Modal
         animationType="fade"
@@ -84,6 +171,8 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
                   isFavorite ? "remove-from-favorites" : "add-to-favorites"
                 )
               }
+              disabled={isLoading}
+              style={{ opacity: isLoading ? 0.6 : 1 }}
             >
               <Ionicons
                 name={isFavorite ? "heart" : "heart-outline"}
@@ -92,13 +181,15 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
                 style={{ marginRight: 12 }}
               />
               <Text className="text-white text-base">
-                {isFavorite ? "Remove from favorites" : "Add to favorites"}
+                {getLikeActionText(isFavorite)}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               className="flex-row items-center p-3 rounded-lg mt-2"
               onPress={() => handlePressAction("add-to-playlist")}
+              disabled={isLoading}
+              style={{ opacity: isLoading ? 0.6 : 1 }}
             >
               <Ionicons
                 name="add-circle-outline"

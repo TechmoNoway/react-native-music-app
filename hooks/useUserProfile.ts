@@ -1,5 +1,5 @@
 import { UserService } from "@/services/userService";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useUser } from "./useUser";
 
 export const useUserProfile = () => {
@@ -7,21 +7,34 @@ export const useUserProfile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { updateUser } = useUser();
+  const isMountedRef = useRef(true);
 
-  const fetchProfile = useCallback(async () => {
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  const fetchProfile = useCallback(async (forceRefresh: boolean = false) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const profile = await UserService.getUserProfile();
-      setProfileData(profile);
+      const profile = await UserService.getUserProfile(forceRefresh);
+      if (isMountedRef.current) {
+        setProfileData(profile);
+      }
       return profile;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch profile";
-      setError(errorMessage);
+      if (isMountedRef.current) {
+        setError(errorMessage);
+      }
       throw err;
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
@@ -83,5 +96,9 @@ export const useUserProfile = () => {
     updateProfile,
     changePassword,
     clearError: () => setError(null),
+    clearCache: () => {
+      setProfileData(null);
+      UserService.clearCache();
+    },
   };
 };

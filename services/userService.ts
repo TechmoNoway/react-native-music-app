@@ -4,6 +4,10 @@ import { storage, StorageKeys } from "@/utils/storage";
 import axios, { isAxiosError } from "axios";
 
 export class UserService {
+  private static profileCache: any = null;
+  private static cacheTimestamp: number = 0;
+  private static readonly CACHE_DURATION = 200 * 60 * 1000; // 200 minutes
+
   private static async getAuthHeaders() {
     try {
       const token = await storage.getItem(StorageKeys.AUTH_TOKEN);
@@ -20,8 +24,16 @@ export class UserService {
     }
   }
 
-  static async getUserProfile() {
+  static async getUserProfile(forceRefresh: boolean = false) {
     try {
+      if (!forceRefresh && this.profileCache && this.cacheTimestamp) {
+        const now = Date.now();
+        if (now - this.cacheTimestamp < this.CACHE_DURATION) {
+          console.log("Returning cached profile data");
+          return this.profileCache;
+        }
+      }
+
       const headers = await this.getAuthHeaders();
 
       const response = await axios.get<UserProfileResponse>(
@@ -33,6 +45,8 @@ export class UserService {
       );
 
       if (response.data.success && response.data.data) {
+        this.profileCache = response.data.data.user;
+        this.cacheTimestamp = Date.now();
         return response.data.data.user;
       } else {
         throw new Error(response.data.message || "Failed to get user profile");
@@ -42,7 +56,7 @@ export class UserService {
 
       if (isAxiosError(error)) {
         if (error.response?.status === 401) {
-          // Token expired or invalid, need to logout
+          this.clearCache();
           throw new Error("Authentication expired");
         }
         throw new Error(error.response?.data?.message || "Failed to fetch user profile");
@@ -70,6 +84,9 @@ export class UserService {
       );
 
       if (response.data.success && response.data.data) {
+        // Cache the result and clear previous cache
+        this.profileCache = response.data.data.user;
+        this.cacheTimestamp = Date.now();
         return response.data.data.user;
       } else {
         throw new Error(response.data.message || "Failed to update profile");
@@ -79,6 +96,9 @@ export class UserService {
 
       if (isAxiosError(error)) {
         if (error.response?.status === 401) {
+          // Clear cache on auth error
+          this.profileCache = null;
+          this.cacheTimestamp = 0;
           throw new Error("Authentication expired");
         }
         throw new Error(error.response?.data?.message || "Failed to update profile");
@@ -86,6 +106,11 @@ export class UserService {
 
       throw error;
     }
+  }
+
+  static clearCache() {
+    this.profileCache = null;
+    this.cacheTimestamp = 0;
   }
 
   static async changePassword(currentPassword: string, newPassword: string) {

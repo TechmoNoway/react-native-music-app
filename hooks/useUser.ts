@@ -1,3 +1,4 @@
+import { UserService } from "@/services/userService";
 import { storage, StorageKeys } from "@/utils/storage";
 import { useEffect, useState } from "react";
 
@@ -57,6 +58,9 @@ export const useUser = () => {
       await storage.removeItem(StorageKeys.REFRESH_TOKEN);
       await storage.removeItem(StorageKeys.USER_CREDENTIALS);
       await storage.removeItem(StorageKeys.REMEMBER_ME);
+
+      UserService.clearCache();
+
       setUser(null);
     } catch (error) {
       console.error("Error logging out:", error);

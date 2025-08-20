@@ -23,8 +23,8 @@ class SongsService {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
-      } catch (error) {
-        console.log("Error getting auth token:", error);
+      } catch {
+        // Silent error handling for auth token
       }
       return config;
     });
@@ -59,10 +59,10 @@ class SongsService {
       });
 
       if (response.data.success) {
-        const tracks = response.data.data;
+        const songs = response.data.data.songs; // Based on backend response structure
 
         return {
-          tracks,
+          tracks: songs, // Return as tracks for consistency
           pagination: response.data.pagination,
         };
       }
@@ -94,11 +94,11 @@ class SongsService {
       });
 
       if (response.data.success) {
-        const tracks = response.data.data;
+        const songs = response.data.data.songs; // Based on backend response structure
 
         return {
-          tracks,
-          total: response.data.pagination?.totalItems || tracks.length,
+          tracks: songs, // Return as tracks for consistency
+          total: response.data.data.total || songs.length,
         };
       }
 

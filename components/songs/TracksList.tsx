@@ -4,7 +4,7 @@ import AudioService from "@/services/audioService";
 import { useQueue } from "@/store/hooks";
 import { Track } from "@/types/audio";
 import { useCallback, useRef, useState } from "react";
-import { FlatList, FlatListProps, Text, View } from "react-native";
+import { Alert, FlatList, FlatListProps, Text, View } from "react-native";
 
 export type TracksListProps = Partial<FlatListProps<Track>> & {
   id: string;
@@ -48,7 +48,19 @@ export const TracksList = ({
       try {
         console.log("Processing track selection:", selectedTrack.title);
 
-        const trackIndex = tracks.findIndex((track) => track.fileUrl === selectedTrack.fileUrl);
+        // Check if track has valid fileUrl
+        if (!selectedTrack.fileUrl || selectedTrack.fileUrl.trim() === "") {
+          Alert.alert(
+            "Cannot Play Track",
+            `"${selectedTrack.title}" is not available for playback. This track does not have an audio file.`,
+            [{ text: "OK" }]
+          );
+          return;
+        }
+
+        const trackIndex = tracks.findIndex(
+          (track) => track.fileUrl === selectedTrack.fileUrl
+        );
 
         if (trackIndex === -1) {
           console.log("Track not found in list");

@@ -1,32 +1,9 @@
-import library from "@/assets/data/library.json";
 import { PlaylistMetadata, TrackWithPlaylist } from "@/helpers/types";
 import { playlistService } from "@/services/playlistService";
 import { PlaylistApiResponse } from "@/types/api";
 import { Track } from "@/types/audio";
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 
-const transformLegacyTrack = (legacyTrack: any): TrackWithPlaylist => ({
-  _id: `legacy_${Date.now()}_${Math.random()}`,
-  title: legacyTrack.title,
-  artist: {
-    _id: `artist_${Date.now()}`,
-    name: legacyTrack.artist,
-  },
-  duration: 0,
-  genre: "Unknown",
-  fileUrl: legacyTrack.url,
-  thumbnailUrl: legacyTrack.artwork,
-  lyrics: undefined,
-  isPublic: true,
-  playCount: 0,
-  uploadedBy: "unknown",
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
-  rating: undefined,
-  playlist: [],
-});
-
-// Async thunks for API integration
 export const fetchUserPlaylists = createAsyncThunk(
   "library/fetchUserPlaylists",
   async (filters?: { type?: string; search?: string }) => {
@@ -72,7 +49,7 @@ interface LibraryState {
 }
 
 const initialState: LibraryState = {
-  tracks: library.map(transformLegacyTrack),
+  tracks: [],
   playlistsMetadata: [
     {
       name: "Liked Songs",
@@ -91,7 +68,7 @@ const librarySlice = createSlice({
     toggleTrackFavorite: (state, action: PayloadAction<Track>) => {
       const track = action.payload;
       const trackIndex = state.tracks.findIndex(
-        (currentTrack) => currentTrack.url === track.url
+        (currentTrack) => currentTrack._id === track._id
       );
 
       if (trackIndex !== -1) {
@@ -115,7 +92,7 @@ const librarySlice = createSlice({
     ) => {
       const { track, playlistName } = action.payload;
       const trackIndex = state.tracks.findIndex(
-        (currentTrack) => currentTrack.url === track.url
+        (currentTrack) => currentTrack._id === track._id
       );
 
       if (trackIndex !== -1) {
@@ -208,7 +185,6 @@ const librarySlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // Fetch user playlists
     builder
       .addCase(fetchUserPlaylists.pending, (state) => {
         state.loading = true;
@@ -218,7 +194,6 @@ const librarySlice = createSlice({
         state.loading = false;
         state.apiPlaylists = action.payload.playlists;
 
-        // Update local playlists metadata from API response
         const apiPlaylistsMetadata: PlaylistMetadata[] = action.payload.playlists.map(
           (p) => ({
             name: p.name,
@@ -235,7 +210,6 @@ const librarySlice = createSlice({
         state.error = action.error.message || "Failed to fetch playlists";
       });
 
-    // Create playlist
     builder
       .addCase(createPlaylistAsync.pending, (state) => {
         state.loading = true;

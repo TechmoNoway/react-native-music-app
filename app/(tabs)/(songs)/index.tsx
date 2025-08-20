@@ -1,18 +1,15 @@
 import { TracksList } from "@/components/songs/TracksList";
-import { trackTitleFilter } from "@/helpers/filter";
 import { generateTracksListId } from "@/helpers/miscellaneous";
-import { useTracks } from "@/store/hooks";
+import { songsService } from "@/services/songsService";
 import { defaultStyles } from "@/styles";
 import { Track } from "@/types/audio";
 import { Ionicons } from "@expo/vector-icons";
-import axios from "axios";
-import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// Music genres with colors
 const musicGenres = [
+  { name: "All", color: "#6c5ce7", icon: "apps" },
   { name: "Pop", color: "#ff6b6b", icon: "musical-notes" },
   { name: "Rock", color: "#4ecdc4", icon: "flash" },
   { name: "Hip Hop", color: "#45b7d1", icon: "mic" },
@@ -27,96 +24,50 @@ const musicGenres = [
   { name: "Indie", color: "#ffa502", icon: "star" },
 ];
 
-const API_BASE_URL = "https://nodejs-music-app-backend.vercel.app/api";
-
 const SongsScreen = () => {
-  const [search, setSearch] = useState("");
-  const [apiSongs, setApiSongs] = useState<Track[]>([]);
-  const [loading, setLoading] = useState(false);
-  const tracks = useTracks();
   const { top, bottom } = useSafeAreaInsets();
-  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedGenre, setSelectedGenre] = useState("All");
+  const [songs, setSongs] = useState<Track[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const fetchSongs = async (searchQuery?: string) => {
     setLoading(true);
 
     try {
-      const response = await axios.get(`${API_BASE_URL}/songs`, {
-        params: {
-          search: searchQuery || "",
-        },
-        timeout: 10000,
-      });
+      let response;
+      if (searchQuery && searchQuery.trim()) {
+        response = await songsService.searchSongs(searchQuery);
+      } else {
+        response = await songsService.getAllSongs({});
+      }
 
-      const transformedSongs: Track[] = response.data.data.songs.map((item: any) => ({
-        _id: item._id || `song_${item.id}`,
-        title: item.title || `Song ${item.id}`,
-        artist: {
-          _id: item.artist?._id || `artist_${item.userId || "unknown"}`,
-          name: item.artist?.name || `Artist ${item.userId}` || "Unknown Artist",
+      const songs = response.tracks || [];
+      console.log("Songs array:", songs);
+      const transformedSongs: Track[] = songs.map((item: any) => ({
+        _id: item._id || `song_${Math.random()}`,
+        title: item.title || "Unknown Song",
+        artist: item.artist || {
+          _id: "unknown",
+          name: "Unknown Artist",
         },
-        duration: item.duration || Math.floor(Math.random() * 300) + 120,
-        genre: item.genre || "Unknown",
-        fileUrl: item.fileUrl || `https://example.com/song/${item.id}.mp3`,
+        duration: item.duration || 180,
+        genre: item.genre || "Other",
+        fileUrl: item.fileUrl || "",
         thumbnailUrl:
-          item.thumbnailUrl || `https://picsum.photos/300/300?random=${item.id}`,
-        lyrics: item.lyrics,
+          item.thumbnailUrl || `https://picsum.photos/300/300?random=${Math.random()}`,
         isPublic: item.isPublic !== false,
         playCount: item.playCount || 0,
-        uploadedBy: item.uploadedBy || "unknown",
+        likedBy: item.likedBy || [],
+        likesCount: item.likesCount || 0,
         createdAt: item.createdAt || new Date().toISOString(),
         updatedAt: item.updatedAt || new Date().toISOString(),
       }));
 
-      setApiSongs(transformedSongs);
+      console.log("Transformed songs:", transformedSongs);
+      setSongs(transformedSongs);
     } catch (err) {
       console.error("Error fetching songs:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const searchSongs = async (query: string) => {
-    if (!query.trim()) {
-      setApiSongs([]);
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/songs`, {
-        params: {
-          search: query,
-        },
-        timeout: 10000,
-      });
-
-      const transformedSongs: Track[] = response.data.data.songs
-        .filter((item: any) => item.title.toLowerCase().includes(query.toLowerCase()))
-        .map((item: any) => ({
-          _id: item._id || `song_${item.id}`,
-          title: item.title,
-          artist: {
-            _id: item.artist?._id || `artist_${item.userId || "unknown"}`,
-            name: item.artist?.name || `Artist ${item.userId}` || "Unknown Artist",
-          },
-          duration: item.duration || Math.floor(Math.random() * 300) + 120,
-          genre: item.genre || "Search Results",
-          fileUrl: item.fileUrl || `https://example.com/song/${item.id}.mp3`,
-          thumbnailUrl:
-            item.thumbnailUrl || `https://picsum.photos/300/300?random=${item.id}`,
-          lyrics: item.lyrics,
-          isPublic: item.isPublic !== false,
-          playCount: item.playCount || 0,
-          uploadedBy: item.uploadedBy || "unknown",
-          createdAt: item.createdAt || new Date().toISOString(),
-          updatedAt: item.updatedAt || new Date().toISOString(),
-        }));
-
-      setApiSongs(transformedSongs);
-    } catch (err) {
-      console.error("Error searching songs:", err);
     } finally {
       setLoading(false);
     }
@@ -126,54 +77,29 @@ const SongsScreen = () => {
     fetchSongs();
   }, []);
 
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (search) {
-        searchSongs(search);
-      } else {
-        setApiSongs([]);
-        fetchSongs();
-      }
-    }, 500);
+  const filteredSongs = useMemo(() => {
+    let filtered = songs;
 
-    return () => clearTimeout(timeoutId);
-  }, [search]);
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(
+        (song) =>
+          song.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (typeof song.artist === "string" ? song.artist : song.artist.name)
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
+      );
+    }
 
-  const filteredTracks = useMemo(() => {
-    if (!search) return tracks;
-    return tracks.filter(trackTitleFilter(search));
-  }, [search, tracks]);
+    if (selectedGenre !== "All") {
+      filtered = filtered.filter((song) => song.genre === selectedGenre);
+    }
 
-  const transformedTracks = useMemo(() => {
-    return apiSongs.map((song) => ({
-      _id: song._id,
-      title: song.title,
-      artist:
-        typeof song.artist === "string"
-          ? { _id: "unknown", name: song.artist }
-          : song.artist,
-      duration: song.duration || 0,
-      genre: song.genre || "Unknown",
-      fileUrl: song.fileUrl || "",
-      thumbnailUrl: song.thumbnailUrl || "",
-      lyrics: song.lyrics,
-      isPublic: song.isPublic !== false,
-      playCount: song.playCount || 0,
-      uploadedBy: song.uploadedBy || "unknown",
-      createdAt: song.createdAt || new Date().toISOString(),
-      updatedAt: song.updatedAt || new Date().toISOString(),
-    }));
-  }, [apiSongs]);
-
-  const handleGenrePress = (genre: string) => {
-    router.push({
-      pathname: "/(tabs)/(songs)/genre/[genre]",
-      params: { genre: genre.toLowerCase() },
-    });
-  };
+    return filtered;
+  }, [searchQuery, selectedGenre, songs]);
 
   const handleRefresh = () => {
-    setSearch("");
+    setSearchQuery("");
+    setSelectedGenre("All");
     fetchSongs();
   };
 
@@ -200,6 +126,13 @@ const SongsScreen = () => {
           </TouchableOpacity>
         </View>
 
+        {/* Info Message */}
+        <View className="bg-blue-900/30 p-3 rounded-lg mb-4">
+          <Text className="text-blue-300 text-sm">
+            🎵 Browse songs by genre or search for your favorite tracks!
+          </Text>
+        </View>
+
         {/* Search Input */}
         <View
           style={{
@@ -209,131 +142,105 @@ const SongsScreen = () => {
             paddingVertical: 5,
             flexDirection: "row",
             alignItems: "center",
-            marginBottom: 24,
+            marginBottom: 20,
           }}
         >
           <Ionicons name="search" size={20} color="#666" style={{ marginRight: 12 }} />
           <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search songs from API..."
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search songs..."
             className="flex-1 text-[#666] text-base"
           />
-          {search ? (
-            <TouchableOpacity onPress={() => setSearch("")} style={{ marginLeft: 12 }}>
+          {searchQuery ? (
+            <TouchableOpacity
+              onPress={() => setSearchQuery("")}
+              style={{ marginLeft: 12 }}
+            >
               <Ionicons name="close-circle" size={20} color="#666" />
             </TouchableOpacity>
           ) : null}
         </View>
 
-        {/* Content */}
-        {search ? (
-          <View>
-            {/* API Search Results */}
-            {transformedTracks.length > 0 && (
-              <View className="mb-6">
-                <Text className="text-white text-lg font-semibold mb-4">
-                  API Results ({transformedTracks.length})
-                </Text>
-                <TracksList
-                  hideQueueControls={true}
-                  id={generateTracksListId("api-songs", search)}
-                  tracks={tracks}
-                  scrollEnabled={false}
-                />
-              </View>
-            )}
-
-            {/* Local Search Results */}
-            {filteredTracks.length > 0 && (
-              <View>
-                <Text className="text-white text-lg font-semibold mb-4">
-                  Local Results ({filteredTracks.length})
-                </Text>
-                <TracksList
-                  hideQueueControls={true}
-                  id={generateTracksListId("local-songs", search)}
-                  tracks={filteredTracks}
-                  scrollEnabled={false}
-                />
-              </View>
-            )}
-
-            {/* No Results */}
-            {!loading &&
-              transformedTracks.length === 0 &&
-              filteredTracks.length === 0 && (
-                <View className="py-8">
-                  <Text className="text-white text-center">
-                    No songs found for &quot;{search}&quot;
-                  </Text>
-                </View>
-              )}
-          </View>
-        ) : (
-          <View>
-            {/* API Songs Section */}
-            {tracks.length > 0 && (
-              <View>
-                <Text className="text-white text-lg font-semibold">Popular Songs</Text>
-                <TracksList
-                  hideQueueControls={true}
-                  id={generateTracksListId("api-popular", "popular")}
-                  tracks={tracks.slice(0, 5)}
-                  scrollEnabled={false}
-                />
-              </View>
-            )}
-
-            {/* Browse All Section */}
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "600",
-                color: "#fff",
-                marginBottom: 16,
-              }}
-            >
-              Browse all
-            </Text>
-
-            {/* Genre Grid */}
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                justifyContent: "space-between",
-              }}
-            >
+        {/* Genre Filter */}
+        <View className="mb-6">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View className="flex-row gap-3">
               {musicGenres.map((genre) => (
                 <TouchableOpacity
                   key={genre.name}
-                  onPress={() => handleGenrePress(genre.name)}
+                  onPress={() => setSelectedGenre(genre.name)}
                   style={{
-                    width: "48%",
-                    height: 100,
-                    backgroundColor: genre.color,
-                    borderRadius: 8,
-                    padding: 16,
-                    marginBottom: 12,
-                    justifyContent: "space-between",
+                    backgroundColor:
+                      selectedGenre === genre.name
+                        ? genre.color
+                        : "rgba(255,255,255,0.1)",
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 20,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    borderWidth: selectedGenre === genre.name ? 2 : 0,
+                    borderColor: selectedGenre === genre.name ? "#fff" : "transparent",
                   }}
                 >
+                  <Ionicons
+                    name={genre.icon as any}
+                    size={16}
+                    color={selectedGenre === genre.name ? "#000" : "#fff"}
+                  />
                   <Text
                     style={{
-                      fontSize: 16,
-                      fontWeight: "600",
-                      color: "#fff",
+                      color: selectedGenre === genre.name ? "#000" : "#fff",
+                      fontWeight: selectedGenre === genre.name ? "bold" : "normal",
                     }}
                   >
                     {genre.name}
                   </Text>
-                  <View style={{ alignSelf: "flex-end" }}>
-                    <Ionicons name={genre.icon as any} size={24} color="#fff" />
-                  </View>
                 </TouchableOpacity>
               ))}
             </View>
+          </ScrollView>
+        </View>
+
+        {/* Loading State */}
+        {loading && (
+          <View className="py-8">
+            <Text className="text-white text-center">Loading songs...</Text>
+          </View>
+        )}
+
+        {/* Content */}
+        {!loading && (
+          <View>
+            {filteredSongs.length > 0 ? (
+              <View>
+                <Text className="text-white text-lg font-semibold mb-4">
+                  {searchQuery
+                    ? `Search Results (${filteredSongs.length})`
+                    : selectedGenre === "All"
+                    ? `All Songs (${filteredSongs.length})`
+                    : `${selectedGenre} Songs (${filteredSongs.length})`}
+                </Text>
+                <TracksList
+                  hideQueueControls={true}
+                  id={generateTracksListId("songs", `${selectedGenre}-${searchQuery}`)}
+                  tracks={filteredSongs}
+                  scrollEnabled={false}
+                />
+              </View>
+            ) : (
+              <View className="py-8">
+                <Text className="text-white text-center">
+                  {searchQuery
+                    ? `No songs found for "${searchQuery}"`
+                    : selectedGenre === "All"
+                    ? "No songs available"
+                    : `No ${selectedGenre} songs available`}
+                </Text>
+              </View>
+            )}
           </View>
         )}
       </ScrollView>

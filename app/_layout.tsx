@@ -8,8 +8,10 @@ import { SplashScreen, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Provider } from "react-redux";
+
 import "../global.css";
 
 SplashScreen.preventAutoHideAsync();
@@ -29,8 +31,10 @@ export default function RootLayout() {
     <Provider store={store}>
       <SafeAreaProvider>
         <GestureHandlerRootView className="flex-1 bg-black">
-          <RootNavigation />
-          <StatusBar style="light" backgroundColor={colors.background} />
+          <PaperProvider>
+            <RootNavigation />
+            <StatusBar style="light" backgroundColor={colors.background} />
+          </PaperProvider>
         </GestureHandlerRootView>
       </SafeAreaProvider>
     </Provider>
@@ -98,6 +102,7 @@ const RootNavigation = () => {
     <Stack
       screenOptions={{
         contentStyle: { backgroundColor: colors.background },
+        headerShown: false,
       }}
     >
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

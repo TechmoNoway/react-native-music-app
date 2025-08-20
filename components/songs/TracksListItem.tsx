@@ -1,3 +1,4 @@
+import { FavoriteButton } from "@/components/songs/FavoriteButton";
 import { TrackShortcutsMenu } from "@/components/songs/TrackShortcutsMenu";
 import { StopPropagation } from "@/components/utils/StopPropagation";
 import { unknownTrackImageUri } from "@/constants/images";
@@ -19,15 +20,18 @@ export const TracksListItem = ({
   onTrackSelect: handleTrackSelect,
 }: TracksListItemProps) => {
   const { playing } = useIsPlaying();
-
   const isActiveTrack = useActiveTrack()?.fileUrl === track.fileUrl;
+  const isTrackUnavailable = !track.fileUrl || track.fileUrl.trim() === "";
 
   return (
     <TouchableHighlight
       onPress={() => handleTrackSelect(track)}
       underlayColor="rgba(255,255,255,0.1)"
+      disabled={isTrackUnavailable}
     >
-      <View className="flex-row gap-3 items-center px-2 py-2 bg-black">
+      <View
+        className={`flex-row gap-3 items-center px-2 py-2 bg-black ${isTrackUnavailable ? "opacity-50" : ""}`}
+      >
         <View className="relative">
           <Image
             source={{
@@ -37,7 +41,7 @@ export const TracksListItem = ({
               width: 56,
               height: 56,
               borderRadius: 4,
-              opacity: isActiveTrack ? 0.6 : 1,
+              opacity: isActiveTrack ? 0.6 : isTrackUnavailable ? 0.3 : 1,
             }}
             contentFit="cover"
             transition={300}
@@ -83,11 +87,16 @@ export const TracksListItem = ({
               style={{
                 fontSize: 16,
                 fontWeight: "500",
-                color: isActiveTrack ? "#3b82f6" : "#fff",
+                color: isTrackUnavailable
+                  ? "rgba(255,255,255,0.4)"
+                  : isActiveTrack
+                    ? "#3b82f6"
+                    : "#fff",
                 marginBottom: 2,
               }}
             >
               {track.title}
+              {isTrackUnavailable ? " (Unavailable)" : ""}
             </Text>
 
             {track.artist && (
@@ -104,13 +113,21 @@ export const TracksListItem = ({
           </View>
 
           <StopPropagation>
-            <TrackShortcutsMenu track={track}>
-              <Entypo
-                name="dots-three-vertical"
-                size={18}
-                color="rgba(255,255,255,0.7)"
+            <View className="flex-row items-center gap-1">
+              <FavoriteButton
+                track={track}
+                onToggle={() => {
+                  // Refresh parent if needed
+                }}
               />
-            </TrackShortcutsMenu>
+              <TrackShortcutsMenu track={track}>
+                <Entypo
+                  name="dots-three-vertical"
+                  size={18}
+                  color="rgba(255,255,255,0.7)"
+                />
+              </TrackShortcutsMenu>
+            </View>
           </StopPropagation>
         </View>
       </View>

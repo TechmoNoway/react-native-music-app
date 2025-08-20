@@ -1,11 +1,15 @@
 import { PlaylistTracksList } from "@/components/playlists/PlaylistTracksList";
-import { fontSize } from "@/constants/tokens";
+import { colors, fontSize } from "@/constants/tokens";
+import { convertApiPlaylistToPlaylist } from "@/helpers/types";
+import { playlistService } from "@/services/playlistService";
 import { usePlaylists } from "@/store/hooks";
+import { PlaylistApiResponse } from "@/types/api";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
@@ -61,16 +65,117 @@ const PlaylistScreen = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [apiPlaylist, setApiPlaylist] = useState<PlaylistApiResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   const { playlists, deletePlaylist, renamePlaylist, updatePlaylistDescription } =
     usePlaylists();
 
-  const playlist = playlists.find((playlist) => playlist.name === playlistName);
+  // Load playlist from API
+  const loadPlaylistFromApi = useCallback(async () => {
+    if (!playlistName) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Try to get all playlists and find the matching one
+      const { playlists: userPlaylists } = await playlistService.getUserPlaylists();
+
+      // Find playlist by name (for Liked Songs, it will be playlistType: "liked")
+      const foundPlaylist = userPlaylists.find(
+        (p) =>
+          p.name === playlistName ||
+          (playlistName === "Liked Songs" && p.playlistType === "liked")
+      );
+
+      if (foundPlaylist) {
+        setApiPlaylist(foundPlaylist);
+      } else {
+        setError("Playlist not found");
+      }
+    } catch (err) {
+      console.error("Error loading playlist:", err);
+      setError("Failed to load playlist");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [playlistName]);
+
+  // Load playlist when component mounts
+  useEffect(() => {
+    loadPlaylistFromApi();
+  }, [loadPlaylistFromApi]);
+
+  // Get playlist data (prioritize API data)
+  const playlist = apiPlaylist
+    ? convertApiPlaylistToPlaylist(apiPlaylist)
+    : playlists.find((playlist) => playlist.name === playlistName);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-black justify-center items-center">
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ color: colors.text, marginTop: 16 }}>Loading playlist...</Text>
+      </View>
+    );
+  }
+
+  // Error state
+  if (error && !playlist) {
+    return (
+      <View className="flex-1 bg-black justify-center items-center px-4">
+        <Ionicons name="alert-circle-outline" size={80} color={colors.textMuted} />
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: 20,
+            fontWeight: "600",
+            marginTop: 16,
+            textAlign: "center",
+          }}
+        >
+          Error loading playlist
+        </Text>
+        <Text
+          style={{
+            color: colors.textMuted,
+            fontSize: 16,
+            marginTop: 8,
+            textAlign: "center",
+          }}
+        >
+          {error}
+        </Text>
+        <TouchableOpacity
+          onPress={loadPlaylistFromApi}
+          style={{
+            backgroundColor: colors.primary,
+            paddingHorizontal: 24,
+            paddingVertical: 12,
+            borderRadius: 8,
+            marginTop: 24,
+          }}
+        >
+          <Text style={{ color: "white", fontWeight: "600" }}>Try Again</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{
+            marginTop: 16,
+          }}
+        >
+          <Text style={{ color: colors.textMuted, fontSize: 16 }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (!playlist) {
     console.warn(`Playlist ${playlistName} was not found!`);
-
     return <Redirect href={"/(tabs)/playlists"} />;
   }
 
@@ -144,7 +249,6 @@ const PlaylistScreen = () => {
   };
 
   const gradientColors = getPlaylistGradient(playlist.name);
-  const isEmpty = playlist.tracks.length === 0;
 
   return (
     <View className="flex-1">

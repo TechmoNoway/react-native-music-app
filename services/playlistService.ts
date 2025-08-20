@@ -29,8 +29,8 @@ class PlaylistService {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
-      } catch (error) {
-        console.log("Error getting auth token:", error);
+      } catch {
+        // Silent error handling for auth token
       }
       return config;
     });
@@ -154,23 +154,61 @@ class PlaylistService {
     }
   }
 
-  // Helper method to add song to liked songs (will find or create liked songs playlist)
-  async addToLikedSongs(track: Track): Promise<{ playlist: PlaylistApiResponse }> {
+  // Like a song using the new /songs/:id/like endpoint
+  async likeSong(track: Track): Promise<{ songId: string; likesCount: number }> {
     try {
-      // First, get user's playlists to find the liked songs playlist
-      const { playlists } = await this.getUserPlaylists({ type: "liked" });
+      const response = await this.apiClient.post<{
+        success: boolean;
+        message?: string;
+        data: {
+          songId: string;
+          likesCount: number;
+        };
+      }>(`/songs/${track._id}/like`);
 
-      let likedPlaylist = playlists.find((p) => p.playlistType === "liked");
-
-      if (!likedPlaylist) {
-        throw new Error("Liked songs playlist not found");
+      if (response.data.success) {
+        return response.data.data;
       }
 
-      return await this.addSongToPlaylist(likedPlaylist._id, { songId: track._id });
+      throw new Error(response.data.message || "Failed to like song");
     } catch (error) {
-      console.error("Error adding to liked songs:", error);
+      console.error("Error liking song:", error);
       throw error;
     }
+  }
+
+  // Unlike a song using the new /songs/:id/unlike endpoint
+  async unlikeSong(track: Track): Promise<{ songId: string; likesCount: number }> {
+    try {
+      const response = await this.apiClient.post<{
+        success: boolean;
+        message?: string;
+        data: {
+          songId: string;
+          likesCount: number;
+        };
+      }>(`/songs/${track._id}/unlike`);
+
+      if (response.data.success) {
+        return response.data.data;
+      }
+
+      throw new Error(response.data.message || "Failed to unlike song");
+    } catch (error) {
+      console.error("Error unliking song:", error);
+      throw error;
+    }
+  }
+
+  // Legacy methods - keeping for backward compatibility but now using new endpoints
+  async addToLikedSongs(track: Track): Promise<{ songId: string; likesCount: number }> {
+    return this.likeSong(track);
+  }
+
+  async removeFromLikedSongs(
+    track: Track
+  ): Promise<{ songId: string; likesCount: number }> {
+    return this.unlikeSong(track);
   }
 
   // Helper method to remove song from playlist (if backend supports it)
