@@ -3,7 +3,7 @@ import { colors } from "@/constants/tokens";
 import { playlistNameFilter } from "@/helpers/filter";
 import { Playlist, convertApiPlaylistToPlaylist } from "@/helpers/types";
 import { playlistService } from "@/services/playlistService";
-import { usePlaylists } from "@/store/hooks";
+import { useApiPlaylists, usePlaylists } from "@/store/hooks";
 import { defaultStyles } from "@/styles";
 import { PlaylistApiResponse } from "@/types/api";
 import { Ionicons } from "@expo/vector-icons";
@@ -35,7 +35,8 @@ const PlaylistsScreen = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { playlists, createPlaylist } = usePlaylists();
+  const { playlists } = usePlaylists();
+  const { createPlaylist: createApiPlaylist } = useApiPlaylists();
   const { top, bottom } = useSafeAreaInsets();
 
   const loadApiPlaylists = useCallback(async () => {
@@ -93,7 +94,7 @@ const PlaylistsScreen = () => {
     setShowCreateDialog(true);
   };
 
-  const handleCreatePlaylist = () => {
+  const handleCreatePlaylist = async () => {
     if (!newPlaylistName.trim()) {
       Alert.alert("Error", "Please enter a playlist name");
       return;
@@ -113,16 +114,27 @@ const PlaylistsScreen = () => {
       return;
     }
 
-    // Create the playlist
-    createPlaylist(newPlaylistName.trim());
+    try {
+      // Create the playlist using the API
+      await createApiPlaylist({
+        name: newPlaylistName.trim(),
+        description: "",
+        coverImageUrl: "",
+      });
 
-    setShowCreateDialog(false);
-    setNewPlaylistName("");
+      setShowCreateDialog(false);
+      setNewPlaylistName("");
 
-    // Navigate to the new playlist
-    setTimeout(() => {
-      router.push(`/(tabs)/playlists/${newPlaylistName.trim()}`);
-    }, 100);
+      // Refresh playlists to show the new one
+      onRefresh();
+
+      // Navigate to the new playlist
+      setTimeout(() => {
+        router.push(`/(tabs)/playlists/${newPlaylistName.trim()}`);
+      }, 100);
+    } catch {
+      Alert.alert("Error", "Failed to create playlist. Please try again.");
+    }
   };
 
   const handleCancelCreate = () => {

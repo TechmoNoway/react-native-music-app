@@ -36,7 +36,29 @@ export const toggleTrackFavoriteAsync = createAsyncThunk(
   "library/toggleTrackFavorite",
   async (track: Track) => {
     const response = await playlistService.addToLikedSongs(track);
-    return { track, playlist: response.playlist };
+    return { track, likeData: response };
+  }
+);
+
+export const updatePlaylistAsync = createAsyncThunk(
+  "library/updatePlaylist",
+  async ({
+    playlistId,
+    updateData,
+  }: {
+    playlistId: string;
+    updateData: { name?: string; description?: string; coverImageUrl?: string };
+  }) => {
+    const response = await playlistService.updatePlaylist(playlistId, updateData);
+    return response.playlist;
+  }
+);
+
+export const deletePlaylistAsync = createAsyncThunk(
+  "library/deletePlaylist",
+  async (playlistId: string) => {
+    await playlistService.deletePlaylist(playlistId);
+    return playlistId;
   }
 );
 
@@ -265,15 +287,10 @@ const librarySlice = createSlice({
       .addCase(toggleTrackFavoriteAsync.fulfilled, (state, action) => {
         state.loading = false;
 
-        // Update the liked songs playlist in apiPlaylists
-        const likedPlaylistIndex = state.apiPlaylists.findIndex(
-          (p) => p.playlistType === "liked"
-        );
-        if (likedPlaylistIndex !== -1) {
-          state.apiPlaylists[likedPlaylistIndex] = action.payload.playlist;
-        }
+        // Note: API response only contains like count, not full playlist
+        // We'll rely on fetching playlists separately for full sync
 
-        // Also update local tracks state for backward compatibility
+        // Update local tracks state for backward compatibility
         const trackIndex = state.tracks.findIndex(
           (currentTrack) => currentTrack._id === action.payload.track._id
         );
@@ -296,6 +313,68 @@ const librarySlice = createSlice({
       .addCase(toggleTrackFavoriteAsync.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error.message || "Failed to toggle favorite";
+      });
+
+    // Update playlist
+    builder
+      .addCase(updatePlaylistAsync.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(updatePlaylistAsync.fulfilled, (state, action) => {
+        state.loading = false;
+
+        // Update the playlist in apiPlaylists
+        const playlistIndex = state.apiPlaylists.findIndex(
+          (p) => p._id === action.payload._id
+        );
+        if (playlistIndex !== -1) {
+          state.apiPlaylists[playlistIndex] = action.payload;
+        }
+
+        // Update in local metadata
+        const metadataIndex = state.playlistsMetadata.findIndex(
+          (p) => p.name === action.payload.name
+        );
+        if (metadataIndex !== -1) {
+          state.playlistsMetadata[metadataIndex] = {
+            name: action.payload.name,
+            customImage: action.payload.coverImageUrl,
+            description: action.payload.description,
+            isDefault: action.payload.isDefault,
+          };
+        }
+      })
+      .addCase(updatePlaylistAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || "Failed to update playlist";
+      });
+
+    // Delete playlist
+    builder
+      .addCase(deletePlaylistAsync.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deletePlaylistAsync.fulfilled, (state, action) => {
+        state.loading = false;
+
+        // Find playlist to remove before filtering
+        const playlistToRemove = state.apiPlaylists.find((p) => p._id === action.payload);
+
+        // Remove from apiPlaylists
+        state.apiPlaylists = state.apiPlaylists.filter((p) => p._id !== action.payload);
+
+        // Remove from local metadata
+        if (playlistToRemove) {
+          state.playlistsMetadata = state.playlistsMetadata.filter(
+            (p) => p.name !== playlistToRemove.name
+          );
+        }
+      })
+      .addCase(deletePlaylistAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || "Failed to delete playlist";
       });
   },
 });

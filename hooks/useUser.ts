@@ -24,7 +24,6 @@ export const useUser = () => {
   const loadUser = async () => {
     try {
       const userData = await storage.getItem(StorageKeys.USER_DATA);
-      console.log("useUser loadUser - userData from storage:", userData);
       setUser(userData);
     } catch (error) {
       console.error("Error loading user:", error);

@@ -1,8 +1,9 @@
 import { PlaylistTracksList } from "@/components/playlists/PlaylistTracksList";
 import { colors, fontSize } from "@/constants/tokens";
 import { convertApiPlaylistToPlaylist } from "@/helpers/types";
+import AudioService from "@/services/audioService";
 import { playlistService } from "@/services/playlistService";
-import { usePlaylists } from "@/store/hooks";
+import { useApiPlaylists, usePlaylists } from "@/store/hooks";
 import { PlaylistApiResponse } from "@/types/api";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -11,6 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -23,8 +25,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Predefined gradient colors for different playlist types
-const getPlaylistGradient = (playlistName: string): [string, string] => {
-  const gradients: Record<string, [string, string]> = {
+const getPlaylistGradient = (
+  playlistName: string,
+  isDefault: boolean = false,
+  hasTrack: boolean = false
+): [string, string] => {
+  const predefinedGradients: Record<string, [string, string]> = {
     "Liked Songs": ["#3b4371", "#000000"],
     "Recently Played": ["#1e3a8a", "#000000"],
     "Top Hits": ["#dc2626", "#000000"],
@@ -35,27 +41,37 @@ const getPlaylistGradient = (playlistName: string): [string, string] => {
     Electronic: ["#7c3aed", "#000000"],
   };
 
+  // For default playlists, use predefined gradients
+  if (isDefault && predefinedGradients[playlistName]) {
+    return predefinedGradients[playlistName];
+  }
+
+  // For custom playlists, use vibrant colors based on name hash
+  const customGradients = [
+    ["#6366f1", "#1e1b4b"], // Indigo to dark indigo
+    ["#ec4899", "#831843"], // Pink to dark pink
+    ["#10b981", "#064e3b"], // Emerald to dark emerald
+    ["#f59e0b", "#92400e"], // Amber to dark amber
+    ["#8b5cf6", "#581c87"], // Violet to dark violet
+    ["#06b6d4", "#164e63"], // Cyan to dark cyan
+    ["#ef4444", "#7f1d1d"], // Red to dark red
+    ["#84cc16", "#365314"], // Lime to dark lime
+    ["#f97316", "#9a3412"], // Orange to dark orange
+    ["#3b82f6", "#1e3a8a"], // Blue to dark blue
+  ];
+
+  // For empty custom playlists, use darker/muted colors
+  if (!hasTrack && !isDefault) {
+    return ["#374151", "#111827"]; // Gray gradient for empty playlists
+  }
+
   // Use playlist name hash to generate consistent colors
   const hash = playlistName.split("").reduce((a, b) => {
     a = (a << 5) - a + b.charCodeAt(0);
     return a & a;
   }, 0);
 
-  const colors = [
-    ["#1e40af", "#000000"], // Blue
-    ["#dc2626", "#000000"], // Red
-    ["#059669", "#000000"], // Green
-    ["#7c2d12", "#000000"], // Orange
-    ["#7c3aed", "#000000"], // Purple
-    ["#db2777", "#000000"], // Pink
-    ["#0891b2", "#000000"], // Cyan
-    ["#65a30d", "#000000"], // Lime
-  ];
-
-  return (
-    gradients[playlistName] ||
-    (colors[Math.abs(hash) % colors.length] as [string, string])
-  );
+  return customGradients[Math.abs(hash) % customGradients.length] as [string, string];
 };
 
 const PlaylistScreen = () => {
@@ -70,8 +86,9 @@ const PlaylistScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const { playlists, deletePlaylist, renamePlaylist, updatePlaylistDescription } =
-    usePlaylists();
+  const { playlists } = usePlaylists();
+  const { updatePlaylist: updateApiPlaylist, deletePlaylist: deleteApiPlaylist } =
+    useApiPlaylists();
 
   // Load playlist from API
   const loadPlaylistFromApi = useCallback(async () => {
@@ -190,33 +207,48 @@ const PlaylistScreen = () => {
     setShowEditModal(true);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editName.trim()) {
       Alert.alert("Error", "Please enter a playlist name");
       return;
     }
 
-    // Check if name changed and if new name already exists
-    if (editName.trim() !== playlist.name) {
-      const existingPlaylist = playlists.find(
-        (p) => p.name.toLowerCase() === editName.trim().toLowerCase()
-      );
+    if (!apiPlaylist?._id) {
+      Alert.alert("Error", "Playlist not found");
+      return;
+    }
 
-      if (existingPlaylist) {
-        Alert.alert("Error", "A playlist with this name already exists");
-        return;
+    try {
+      // Check if name changed and if new name already exists
+      if (editName.trim() !== playlist.name) {
+        const existingPlaylist = playlists.find(
+          (p) => p.name.toLowerCase() === editName.trim().toLowerCase()
+        );
+
+        if (existingPlaylist) {
+          Alert.alert("Error", "A playlist with this name already exists");
+          return;
+        }
       }
 
-      // Rename playlist
-      renamePlaylist(playlist.name, editName.trim());
-    }
+      // Update playlist using API
+      await updateApiPlaylist(apiPlaylist._id, {
+        name: editName.trim(),
+        description: editDescription.trim(),
+      });
 
-    // Update description
-    if (editDescription.trim() !== (playlist.description || "")) {
-      updatePlaylistDescription(editName.trim(), editDescription.trim());
-    }
+      // Refresh the playlist data
+      await loadPlaylistFromApi();
 
-    setShowEditModal(false);
+      setShowEditModal(false);
+
+      // If name changed, update the URL
+      if (editName.trim() !== playlist.name) {
+        router.replace(`/(tabs)/playlists/${editName.trim()}`);
+      }
+    } catch {
+      Alert.alert("Error", "Failed to update playlist. Please try again.");
+    }
   };
 
   const handleCancelEdit = () => {
@@ -231,6 +263,11 @@ const PlaylistScreen = () => {
       return;
     }
 
+    if (!apiPlaylist?._id) {
+      Alert.alert("Error", "Playlist not found");
+      return;
+    }
+
     Alert.alert(
       "Delete Playlist",
       `Are you sure you want to delete "${playlist.name}"?`,
@@ -239,16 +276,56 @@ const PlaylistScreen = () => {
         {
           text: "Delete",
           style: "destructive",
-          onPress: () => {
-            deletePlaylist(playlist.name);
-            router.back();
+          onPress: async () => {
+            try {
+              await deleteApiPlaylist(apiPlaylist._id);
+              router.back();
+            } catch {
+              Alert.alert("Error", "Failed to delete playlist. Please try again.");
+            }
           },
         },
       ]
     );
   };
 
-  const gradientColors = getPlaylistGradient(playlist.name);
+  const handlePlayPlaylist = async () => {
+    if (playlist.tracks.length === 0) {
+      Alert.alert("Playlist Empty", "Add some songs to play this playlist");
+      return;
+    }
+
+    try {
+      // Set the queue to playlist tracks and start playing from the beginning
+      await AudioService.setQueue(playlist.tracks);
+      await AudioService.playFromQueue(0, false);
+    } catch (error) {
+      console.error("Error playing playlist:", error);
+      Alert.alert("Error", "Failed to play playlist");
+    }
+  };
+
+  const handleShufflePlaylist = async () => {
+    if (playlist.tracks.length === 0) {
+      Alert.alert("Playlist Empty", "Add some songs to shuffle this playlist");
+      return;
+    }
+
+    try {
+      // Set the queue to playlist tracks and start playing with shuffle
+      await AudioService.setQueue(playlist.tracks);
+      await AudioService.playFromQueue(0, true);
+    } catch (error) {
+      console.error("Error shuffling playlist:", error);
+      Alert.alert("Error", "Failed to shuffle playlist");
+    }
+  };
+
+  const gradientColors = getPlaylistGradient(
+    playlist.name,
+    playlist.isDefault,
+    playlist.tracks.length > 0
+  );
 
   return (
     <View className="flex-1">
@@ -286,6 +363,7 @@ const PlaylistScreen = () => {
                 {playlist.name}
               </Text>
               <TouchableOpacity
+                onPress={handlePlayPlaylist}
                 style={{
                   width: 40,
                   height: 40,
@@ -336,6 +414,41 @@ const PlaylistScreen = () => {
               )}
             </View>
 
+            {/* Playlist Header with Thumbnail */}
+            <View style={{ alignItems: "center", marginBottom: 24 }}>
+              {/* Playlist Thumbnail */}
+              {playlist.tracks.length > 0 ? (
+                <Image
+                  source={{ uri: playlist.tracks[0].thumbnailUrl }}
+                  style={{
+                    width: 232,
+                    height: 232,
+                    borderRadius: 8,
+                    marginBottom: 24,
+                  }}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View
+                  style={{
+                    width: 232,
+                    height: 232,
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    borderRadius: 8,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 24,
+                  }}
+                >
+                  <Ionicons
+                    name="musical-notes"
+                    size={80}
+                    color="rgba(255,255,255,0.6)"
+                  />
+                </View>
+              )}
+            </View>
+
             {/* Playlist Title */}
             <Text
               numberOfLines={2}
@@ -349,7 +462,34 @@ const PlaylistScreen = () => {
               {playlist.name}
             </Text>
 
-            {/* Song Count */}
+            {/* Creator and Song Count */}
+            <View
+              style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}
+            >
+              <View
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 12,
+                  backgroundColor: "#3b82f6",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: 8,
+                }}
+              >
+                <Ionicons name="person" size={12} color="white" />
+              </View>
+              <Text
+                style={{
+                  fontSize: 14,
+                  color: "#fff",
+                  fontWeight: "600",
+                }}
+              >
+                Techmo
+              </Text>
+            </View>
+
             <Text
               style={{
                 fontSize: 14,
@@ -361,66 +501,93 @@ const PlaylistScreen = () => {
             </Text>
 
             {/* Download and Controls Row */}
-            <View className="flex-row items-center justify-between mb-6">
-              <TouchableOpacity>
-                <Ionicons
-                  name="download-outline"
-                  size={24}
-                  color="rgba(255,255,255,0.7)"
-                />
-              </TouchableOpacity>
-
-              <View className="flex-row items-center gap-4">
+            {playlist.tracks.length > 0 && (
+              <View className="flex-row items-center justify-between mb-6">
                 <TouchableOpacity>
-                  <Ionicons name="shuffle" size={24} color="#3b82f6" />
+                  <Ionicons
+                    name="download-outline"
+                    size={24}
+                    color="rgba(255,255,255,0.7)"
+                  />
                 </TouchableOpacity>
 
-                <TouchableOpacity
+                <View className="flex-row items-center gap-4">
+                  <TouchableOpacity onPress={handleShufflePlaylist}>
+                    <Ionicons name="shuffle" size={24} color="#3b82f6" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handlePlayPlaylist}
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      backgroundColor: "#3b82f6",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Ionicons name="play" size={24} color="white" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Add to Playlist Section - Only for custom playlists */}
+            {!playlist.isDefault && (
+              <TouchableOpacity
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 16,
+                  paddingHorizontal: 20,
+                  backgroundColor: "rgba(255,255,255,0.05)",
+                  borderRadius: 12,
+                  marginVertical: 8,
+                  borderWidth: 1,
+                  borderColor: "rgba(255,255,255,0.1)",
+                }}
+              >
+                <View
                   style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 28,
-                    backgroundColor: "#3b82f6",
+                    width: 48,
+                    height: 48,
+                    backgroundColor: "rgba(255,255,255,0.1)",
+                    borderRadius: 8,
                     alignItems: "center",
                     justifyContent: "center",
+                    marginRight: 16,
                   }}
                 >
-                  <Ionicons name="play" size={24} color="white" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Add to Playlist Section */}
-            <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 12,
-              }}
-            >
-              <View
-                style={{
-                  width: 56,
-                  height: 56,
-                  backgroundColor: "rgba(255,255,255,0.1)",
-                  borderRadius: 4,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginRight: 12,
-                }}
-              >
-                <Ionicons name="add" size={24} color="rgba(255,255,255,0.7)" />
-              </View>
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: "#fff",
-                  fontWeight: "400",
-                }}
-              >
-                Add to this playlist
-              </Text>
-            </TouchableOpacity>
+                  <Ionicons name="add" size={24} color="#3b82f6" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      color: "#fff",
+                      fontWeight: "600",
+                      marginBottom: 2,
+                    }}
+                  >
+                    Add to this playlist
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      color: "rgba(255,255,255,0.6)",
+                    }}
+                  >
+                    Search and add songs you love
+                  </Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color="rgba(255,255,255,0.4)"
+                />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Songs List with gradient overlay */}

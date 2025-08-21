@@ -1,4 +1,3 @@
-import { FavoriteButton } from "@/components/songs/FavoriteButton";
 import { TrackShortcutsMenu } from "@/components/songs/TrackShortcutsMenu";
 import { StopPropagation } from "@/components/utils/StopPropagation";
 import { unknownTrackImageUri } from "@/constants/images";
@@ -30,7 +29,9 @@ export const TracksListItem = ({
       disabled={isTrackUnavailable}
     >
       <View
-        className={`flex-row gap-3 items-center px-2 py-2 bg-black ${isTrackUnavailable ? "opacity-50" : ""}`}
+        className={`flex-row gap-3 items-center px-2 py-2 bg-black ${
+          isTrackUnavailable ? "opacity-50" : ""
+        }`}
       >
         <View className="relative">
           <Image
@@ -90,8 +91,8 @@ export const TracksListItem = ({
                 color: isTrackUnavailable
                   ? "rgba(255,255,255,0.4)"
                   : isActiveTrack
-                    ? "#3b82f6"
-                    : "#fff",
+                  ? "#3b82f6"
+                  : "#fff",
                 marginBottom: 2,
               }}
             >
@@ -113,21 +114,13 @@ export const TracksListItem = ({
           </View>
 
           <StopPropagation>
-            <View className="flex-row items-center gap-1">
-              <FavoriteButton
-                track={track}
-                onToggle={() => {
-                  // Refresh parent if needed
-                }}
+            <TrackShortcutsMenu track={track}>
+              <Entypo
+                name="dots-three-vertical"
+                size={18}
+                color="rgba(255,255,255,0.7)"
               />
-              <TrackShortcutsMenu track={track}>
-                <Entypo
-                  name="dots-three-vertical"
-                  size={18}
-                  color="rgba(255,255,255,0.7)"
-                />
-              </TrackShortcutsMenu>
-            </View>
+            </TrackShortcutsMenu>
           </StopPropagation>
         </View>
       </View>
