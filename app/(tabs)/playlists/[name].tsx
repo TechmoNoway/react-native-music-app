@@ -579,6 +579,8 @@ const PlaylistScreen = () => {
               hideTitle={true}
               hideControls={true}
               onAddToPlaylist={handleAddToPlaylist}
+              apiPlaylist={apiPlaylist}
+              onSongRemoved={loadPlaylistFromApi}
             />
           </LinearGradient>
 
@@ -660,6 +662,7 @@ const PlaylistScreen = () => {
         playlistId={apiPlaylist?._id || ""}
         playlistName={playlist.name}
         onSongAdded={loadPlaylistFromApi}
+        currentPlaylistSongs={playlist.tracks}
       />
 
       {/* Edit Playlist Modal */}

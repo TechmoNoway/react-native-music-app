@@ -14,6 +14,7 @@ import {
   deletePlaylist as deletePlaylistAction,
   deletePlaylistAsync,
   fetchUserPlaylists,
+  removeSongFromPlaylistAsync,
   renamePlaylist as renamePlaylistAction,
   toggleTrackFavorite as toggleTrackFavoriteAction,
   toggleTrackFavoriteAsync,
@@ -251,6 +252,10 @@ export const useApiPlaylists = () => {
     return dispatch(deletePlaylistAsync(playlistId));
   };
 
+  const removeSongFromPlaylist = (playlistId: string, songId: string) => {
+    return dispatch(removeSongFromPlaylistAsync({ playlistId, songId }));
+  };
+
   return {
     apiPlaylists,
     loading,
@@ -261,6 +266,7 @@ export const useApiPlaylists = () => {
     toggleFavorite,
     updatePlaylist,
     deletePlaylist,
+    removeSongFromPlaylist,
   };
 };
 

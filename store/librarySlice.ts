@@ -62,6 +62,14 @@ export const deletePlaylistAsync = createAsyncThunk(
   }
 );
 
+export const removeSongFromPlaylistAsync = createAsyncThunk(
+  "library/removeSongFromPlaylist",
+  async ({ playlistId, songId }: { playlistId: string; songId: string }) => {
+    const response = await playlistService.removeSongFromPlaylist(playlistId, songId);
+    return response.playlist;
+  }
+);
+
 interface LibraryState {
   tracks: TrackWithPlaylist[];
   playlistsMetadata: PlaylistMetadata[];
@@ -375,6 +383,28 @@ const librarySlice = createSlice({
       .addCase(deletePlaylistAsync.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error.message || "Failed to delete playlist";
+      });
+
+    // Remove song from playlist
+    builder
+      .addCase(removeSongFromPlaylistAsync.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(removeSongFromPlaylistAsync.fulfilled, (state, action) => {
+        state.loading = false;
+
+        // Update the playlist in apiPlaylists
+        const playlistIndex = state.apiPlaylists.findIndex(
+          (p) => p._id === action.payload._id
+        );
+        if (playlistIndex !== -1) {
+          state.apiPlaylists[playlistIndex] = action.payload;
+        }
+      })
+      .addCase(removeSongFromPlaylistAsync.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.error.message || "Failed to remove song from playlist";
       });
   },
 });

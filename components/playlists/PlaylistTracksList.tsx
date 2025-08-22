@@ -14,11 +14,15 @@ export const PlaylistTracksList = ({
   hideTitle = false,
   hideControls = false,
   onAddToPlaylist,
+  apiPlaylist,
+  onSongRemoved,
 }: {
   playlist: Playlist;
   hideTitle?: boolean;
   hideControls?: boolean;
   onAddToPlaylist?: () => void;
+  apiPlaylist?: { _id: string } | null;
+  onSongRemoved?: () => void;
 }) => {
   const search = useNavigationSearch({
     searchBarOptions: {
@@ -86,6 +90,12 @@ export const PlaylistTracksList = ({
       id={generateTracksListId(playlist.name, search)}
       scrollEnabled={false}
       hideQueueControls={true}
+      context={
+        !playlist.isDefault && apiPlaylist?._id
+          ? { type: "playlist" as const, playlistId: apiPlaylist._id }
+          : undefined
+      }
+      onSongRemoved={onSongRemoved}
       ListHeaderComponentStyle={{ flex: 1, marginBottom: 0 }}
       ListHeaderComponent={
         <View>

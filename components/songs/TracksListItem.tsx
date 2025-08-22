@@ -12,11 +12,20 @@ import { Text, TouchableHighlight, View } from "react-native";
 export type TracksListItemProps = {
   track: Track;
   onTrackSelect: (track: Track) => void;
+  // Add context prop for playlist context
+  context?: {
+    type: "playlist";
+    playlistId: string;
+  };
+  // Callback for when song is removed from playlist
+  onSongRemoved?: () => void;
 };
 
 export const TracksListItem = ({
   track,
   onTrackSelect: handleTrackSelect,
+  context,
+  onSongRemoved,
 }: TracksListItemProps) => {
   const { playing } = useIsPlaying();
   const isActiveTrack = useActiveTrack()?.fileUrl === track.fileUrl;
@@ -114,7 +123,11 @@ export const TracksListItem = ({
           </View>
 
           <StopPropagation>
-            <TrackShortcutsMenu track={track}>
+            <TrackShortcutsMenu
+              track={track}
+              context={context}
+              onSongRemoved={onSongRemoved}
+            >
               <Entypo
                 name="dots-three-vertical"
                 size={18}

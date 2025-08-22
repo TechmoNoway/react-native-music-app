@@ -22,6 +22,7 @@ interface AddToPlaylistModalProps {
   playlistId: string;
   playlistName: string;
   onSongAdded?: () => void; // Callback to refresh playlist
+  currentPlaylistSongs?: Track[]; // Current songs in the playlist to filter out
 }
 
 export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
@@ -30,6 +31,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
   playlistId,
   playlistName,
   onSongAdded,
+  currentPlaylistSongs = [],
 }) => {
   const { top } = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState("");
@@ -38,27 +40,46 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const { addSongToPlaylist } = useApiPlaylists();
 
-  // Search songs based on query
-  const searchSongs = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
+  // Helper function to filter out songs already in the playlist
+  const filterAvailableSongs = useCallback(
+    (songs: Track[]): Track[] => {
+      return songs.filter(
+        (song) =>
+          !currentPlaylistSongs.some(
+            (playlistSong) =>
+              playlistSong._id === song._id || playlistSong.fileUrl === song.fileUrl
+          )
+      );
+    },
+    [currentPlaylistSongs]
+  );
 
-    try {
-      setIsSearching(true);
-      const response = await songsService.searchSongs(query.trim(), {
-        limit: 20,
-      });
-      setSearchResults(response.tracks);
-    } catch {
-      console.error("Error searching songs");
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
-    }
-  }, []);
+  // Search songs based on query
+  const searchSongs = useCallback(
+    async (query: string) => {
+      if (!query.trim()) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
+      }
+
+      try {
+        setIsSearching(true);
+        const response = await songsService.searchSongs(query.trim(), {
+          limit: 20,
+        });
+        // Filter out songs already in the playlist
+        const availableSongs = filterAvailableSongs(response.tracks);
+        setSearchResults(availableSongs);
+      } catch {
+        console.error("Error searching songs");
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [filterAvailableSongs]
+  );
 
   // Debounce search
   useEffect(() => {
@@ -73,12 +94,14 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
     try {
       // Load popular songs as suggestions
       const response = await songsService.getPopularSongs(10);
-      setSuggestedSongs(response.tracks);
+      // Filter out songs already in the playlist
+      const availableSongs = filterAvailableSongs(response.tracks);
+      setSuggestedSongs(availableSongs);
     } catch {
       console.error("Error loading suggested songs");
       setSuggestedSongs([]);
     }
-  }, []);
+  }, [filterAvailableSongs]);
 
   useEffect(() => {
     if (visible) {
@@ -297,7 +320,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
                     marginBottom: 8,
                   }}
                 >
-                  No songs found
+                  No new songs found
                 </Text>
                 <Text
                   style={{
@@ -306,7 +329,8 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
                     textAlign: "center",
                   }}
                 >
-                  Try different keywords
+                  Try different keywords or all matching songs are already in this
+                  playlist
                 </Text>
               </View>
             )
@@ -410,7 +434,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
                   marginBottom: 8,
                 }}
               >
-                No songs found
+                All popular songs are already in your playlist
               </Text>
               <Text
                 style={{
@@ -419,7 +443,7 @@ export const AddToPlaylistModal: React.FC<AddToPlaylistModalProps> = ({
                   textAlign: "center",
                 }}
               >
-                Try searching for songs to add to &quot;{playlistName}&quot;
+                Try searching for specific songs to add to &quot;{playlistName}&quot;
               </Text>
             </View>
           )}

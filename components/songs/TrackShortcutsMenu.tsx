@@ -9,7 +9,7 @@ import {
 import { useUser } from "@/hooks/useUser";
 import AudioService from "@/services/audioService";
 import { playlistService } from "@/services/playlistService";
-import { useFavorites, useQueue } from "@/store/hooks";
+import { useApiPlaylists, useFavorites, useQueue } from "@/store/hooks";
 import { Track } from "@/types/audio";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -24,13 +24,28 @@ import {
   View,
 } from "react-native";
 
-type TrackShortcutsMenuProps = PropsWithChildren<{ track: Track }>;
+type TrackShortcutsMenuProps = PropsWithChildren<{
+  track: Track;
+  // Add context prop to determine if we're in a playlist
+  context?: {
+    type: "playlist";
+    playlistId: string;
+  };
+  // Callback for when song is removed from playlist
+  onSongRemoved?: () => void;
+}>;
 
-export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps) => {
+export const TrackShortcutsMenu = ({
+  track,
+  children,
+  context,
+  onSongRemoved,
+}: TrackShortcutsMenuProps) => {
   const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useUser();
+  const { removeSongFromPlaylist } = useApiPlaylists();
 
   // Get user ID - same logic as FavoriteButton for consistency
   const getUserId = () => {
@@ -152,6 +167,22 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
           });
           break;
 
+        case "remove-from-playlist":
+          if (context?.type === "playlist" && context.playlistId) {
+            try {
+              await removeSongFromPlaylist(context.playlistId, track._id);
+              Alert.alert("Success", "Song removed from playlist", [{ text: "OK" }]);
+              // Call the callback to refresh the playlist
+              onSongRemoved?.();
+            } catch (error) {
+              console.error("Error removing song from playlist:", error);
+              Alert.alert("Error", "Failed to remove song from playlist", [
+                { text: "OK" },
+              ]);
+            }
+          }
+          break;
+
         default:
           console.warn(`Unknown menu action ${id}`);
           break;
@@ -230,17 +261,29 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
 
             <TouchableOpacity
               className="flex-row items-center p-3 rounded-lg mt-2"
-              onPress={() => handlePressAction("add-to-playlist")}
+              onPress={() =>
+                handlePressAction(
+                  context?.type === "playlist"
+                    ? "remove-from-playlist"
+                    : "add-to-playlist"
+                )
+              }
               disabled={isLoading}
               style={{ opacity: isLoading ? 0.6 : 1 }}
             >
               <Ionicons
-                name="add-circle-outline"
+                name={
+                  context?.type === "playlist"
+                    ? "remove-circle-outline"
+                    : "add-circle-outline"
+                }
                 size={20}
                 color={colors.icon}
                 style={{ marginRight: 12 }}
               />
-              <Text className="text-white text-base">Add to playlist</Text>
+              <Text className="text-white text-base">
+                {context?.type === "playlist" ? "Remove this song" : "Add to playlist"}
+              </Text>
             </TouchableOpacity>
           </View>
         </Pressable>
