@@ -3,8 +3,9 @@ import { trackTitleFilter } from "@/helpers/filter";
 import { generateTracksListId } from "@/helpers/miscellaneous";
 import { Playlist } from "@/helpers/types";
 import { useNavigationSearch } from "@/hooks/useNavigationSearch";
+import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";
-import { Text, View } from "react-native";
+import { Text, TouchableOpacity, View } from "react-native";
 import { QueueControls } from "../shared/QueueControls";
 import { TracksList } from "../songs/TracksList";
 
@@ -12,10 +13,12 @@ export const PlaylistTracksList = ({
   playlist,
   hideTitle = false,
   hideControls = false,
+  onAddToPlaylist,
 }: {
   playlist: Playlist;
   hideTitle?: boolean;
   hideControls?: boolean;
+  onAddToPlaylist?: () => void;
 }) => {
   const search = useNavigationSearch({
     searchBarOptions: {
@@ -40,27 +43,39 @@ export const PlaylistTracksList = ({
           minHeight: 300,
         }}
       >
-        <Text
+        <TouchableOpacity
+          onPress={onAddToPlaylist}
           style={{
-            fontSize: 20,
-            fontWeight: "600",
-            color: "#fff",
-            textAlign: "center",
-            marginBottom: 12,
+            flexDirection: "row",
+            alignItems: "center",
+            backgroundColor: "rgba(255,255,255,0.1)",
+            borderRadius: 25,
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+            marginBottom: 16,
           }}
         >
-          Let&apos;s find something for your playlist
-        </Text>
+          <Ionicons name="add" size={20} color="#fff" style={{ marginRight: 8 }} />
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: "600",
+              color: "#fff",
+            }}
+          >
+            Add to this playlist
+          </Text>
+        </TouchableOpacity>
+
         <Text
           style={{
             fontSize: 16,
-            color: "rgba(255,255,255,0.6)",
+            color: "rgba(255,255,255,0.7)",
             textAlign: "center",
             lineHeight: 22,
-            marginBottom: 24,
           }}
         >
-          Search for songs or artists to add to this playlist
+          Search for songs and artists
         </Text>
       </View>
     );

@@ -1,3 +1,4 @@
+import { AddToPlaylistModal } from "@/components/playlists/AddToPlaylistModal";
 import { PlaylistTracksList } from "@/components/playlists/PlaylistTracksList";
 import { colors, fontSize } from "@/constants/tokens";
 import { convertApiPlaylistToPlaylist } from "@/helpers/types";
@@ -46,23 +47,23 @@ const getPlaylistGradient = (
     return predefinedGradients[playlistName];
   }
 
-  // For custom playlists, use vibrant colors based on name hash
+  // For custom playlists, use more subtle colors like Liked Songs
   const customGradients = [
-    ["#6366f1", "#1e1b4b"], // Indigo to dark indigo
-    ["#ec4899", "#831843"], // Pink to dark pink
-    ["#10b981", "#064e3b"], // Emerald to dark emerald
-    ["#f59e0b", "#92400e"], // Amber to dark amber
-    ["#8b5cf6", "#581c87"], // Violet to dark violet
-    ["#06b6d4", "#164e63"], // Cyan to dark cyan
-    ["#ef4444", "#7f1d1d"], // Red to dark red
-    ["#84cc16", "#365314"], // Lime to dark lime
-    ["#f97316", "#9a3412"], // Orange to dark orange
-    ["#3b82f6", "#1e3a8a"], // Blue to dark blue
+    ["#4c1d95", "#000000"], // Purple to black
+    ["#831843", "#000000"], // Dark pink to black
+    ["#064e3b", "#000000"], // Dark emerald to black
+    ["#92400e", "#000000"], // Dark amber to black
+    ["#581c87", "#000000"], // Dark violet to black
+    ["#164e63", "#000000"], // Dark cyan to black
+    ["#7f1d1d", "#000000"], // Dark red to black
+    ["#365314", "#000000"], // Dark lime to black
+    ["#9a3412", "#000000"], // Dark orange to black
+    ["#1e3a8a", "#000000"], // Dark blue to black
   ];
 
   // For empty custom playlists, use darker/muted colors
   if (!hasTrack && !isDefault) {
-    return ["#374151", "#111827"]; // Gray gradient for empty playlists
+    return ["#374151", "#000000"]; // Gray to black for empty playlists
   }
 
   // Use playlist name hash to generate consistent colors
@@ -79,6 +80,7 @@ const PlaylistScreen = () => {
   const { top } = useSafeAreaInsets();
   const [isScrolled, setIsScrolled] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showAddSongsModal, setShowAddSongsModal] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [apiPlaylist, setApiPlaylist] = useState<PlaylistApiResponse | null>(null);
@@ -199,6 +201,10 @@ const PlaylistScreen = () => {
   const handleScroll = (event: any) => {
     const scrollY = event.nativeEvent.contentOffset.y;
     setIsScrolled(scrollY > 80);
+  };
+
+  const handleAddToPlaylist = () => {
+    setShowAddSongsModal(true);
   };
 
   const handleEditPlaylist = () => {
@@ -329,7 +335,7 @@ const PlaylistScreen = () => {
 
   return (
     <View className="flex-1">
-      <LinearGradient colors={gradientColors} locations={[0, 0.3]} style={{ flex: 1 }}>
+      <LinearGradient colors={gradientColors} locations={[0, 0.15]} style={{ flex: 1 }}>
         {/* Sticky Header - Back button, title, and play button when scrolled */}
         {isScrolled && (
           <View
@@ -500,16 +506,29 @@ const PlaylistScreen = () => {
               {playlist.tracks.length} song{playlist.tracks.length !== 1 ? "s" : ""}
             </Text>
 
-            {/* Download and Controls Row */}
-            {playlist.tracks.length > 0 && (
+            {/* Controls Row */}
+            {playlist.tracks.length > 0 ? (
+              /* Download and Controls Row for playlists with songs */
               <View className="flex-row items-center justify-between mb-6">
-                <TouchableOpacity>
-                  <Ionicons
-                    name="download-outline"
-                    size={24}
-                    color="rgba(255,255,255,0.7)"
-                  />
-                </TouchableOpacity>
+                <View className="flex-row items-center gap-4">
+                  <TouchableOpacity>
+                    <Ionicons
+                      name="download-outline"
+                      size={24}
+                      color="rgba(255,255,255,0.7)"
+                    />
+                  </TouchableOpacity>
+
+                  {!playlist.isDefault && (
+                    <TouchableOpacity onPress={handleAddToPlaylist}>
+                      <Ionicons
+                        name="add-circle-outline"
+                        size={24}
+                        color="rgba(255,255,255,0.7)"
+                      />
+                    </TouchableOpacity>
+                  )}
+                </View>
 
                 <View className="flex-row items-center gap-4">
                   <TouchableOpacity onPress={handleShufflePlaylist}>
@@ -531,62 +550,21 @@ const PlaylistScreen = () => {
                   </TouchableOpacity>
                 </View>
               </View>
-            )}
-
-            {/* Add to Playlist Section - Only for custom playlists */}
-            {!playlist.isDefault && (
-              <TouchableOpacity
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
-                  backgroundColor: "rgba(255,255,255,0.05)",
-                  borderRadius: 12,
-                  marginVertical: 8,
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.1)",
-                }}
-              >
-                <View
-                  style={{
-                    width: 48,
-                    height: 48,
-                    backgroundColor: "rgba(255,255,255,0.1)",
-                    borderRadius: 8,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginRight: 16,
-                  }}
-                >
-                  <Ionicons name="add" size={24} color="#3b82f6" />
+            ) : (
+              /* Controls for empty playlists */
+              !playlist.isDefault && (
+                <View className="flex-row items-center justify-between mb-6">
+                  <View className="flex-row items-center gap-4">
+                    <TouchableOpacity onPress={handleAddToPlaylist}>
+                      <Ionicons
+                        name="add-circle-outline"
+                        size={24}
+                        color="rgba(255,255,255,0.7)"
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      color: "#fff",
-                      fontWeight: "600",
-                      marginBottom: 2,
-                    }}
-                  >
-                    Add to this playlist
-                  </Text>
-                  <Text
-                    style={{
-                      fontSize: 14,
-                      color: "rgba(255,255,255,0.6)",
-                    }}
-                  >
-                    Search and add songs you love
-                  </Text>
-                </View>
-                <Ionicons
-                  name="chevron-forward"
-                  size={20}
-                  color="rgba(255,255,255,0.4)"
-                />
-              </TouchableOpacity>
+              )
             )}
           </View>
 
@@ -600,6 +578,7 @@ const PlaylistScreen = () => {
               playlist={playlist}
               hideTitle={true}
               hideControls={true}
+              onAddToPlaylist={handleAddToPlaylist}
             />
           </LinearGradient>
 
@@ -673,6 +652,15 @@ const PlaylistScreen = () => {
           {/* </View> */}
         </ScrollView>
       </LinearGradient>
+
+      {/* Add Songs Modal */}
+      <AddToPlaylistModal
+        visible={showAddSongsModal}
+        onClose={() => setShowAddSongsModal(false)}
+        playlistId={apiPlaylist?._id || ""}
+        playlistName={playlist.name}
+        onSongAdded={loadPlaylistFromApi}
+      />
 
       {/* Edit Playlist Modal */}
       <Modal
