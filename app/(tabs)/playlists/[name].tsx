@@ -7,6 +7,7 @@ import { playlistService } from "@/services/playlistService";
 import { useApiPlaylists, usePlaylists } from "@/store/hooks";
 import { PlaylistApiResponse } from "@/types/api";
 import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -83,9 +84,11 @@ const PlaylistScreen = () => {
   const [showAddSongsModal, setShowAddSongsModal] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
+  const [editThumbnail, setEditThumbnail] = useState<string | null>(null);
   const [apiPlaylist, setApiPlaylist] = useState<PlaylistApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0); // Force re-render key
   const router = useRouter();
 
   const { playlists } = usePlaylists();
@@ -210,7 +213,37 @@ const PlaylistScreen = () => {
   const handleEditPlaylist = () => {
     setEditName(playlist.name);
     setEditDescription(playlist.description || "");
+    setEditThumbnail(apiPlaylist?.coverImageUrl || null);
     setShowEditModal(true);
+  };
+
+  const pickImage = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+      if (permissionResult.granted === false) {
+        Alert.alert(
+          "Permission Required",
+          "Permission to access camera roll is required!"
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: false,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setEditThumbnail(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error("Error picking image:", error);
+      Alert.alert("Error", "Failed to pick image");
+    }
   };
 
   const handleSaveEdit = async () => {
@@ -237,16 +270,26 @@ const PlaylistScreen = () => {
         }
       }
 
-      // Update playlist using API
+      // Update playlist using API with thumbnail support
       await updateApiPlaylist(apiPlaylist._id, {
         name: editName.trim(),
         description: editDescription.trim(),
+        thumbnailUri: editThumbnail || undefined,
       });
 
-      // Refresh the playlist data
+      // Close modal first
+      setShowEditModal(false);
+
+      // Clear edit states
+      setEditName("");
+      setEditDescription("");
+      setEditThumbnail(null);
+
+      // Force refresh the playlist data to get updated thumbnail
       await loadPlaylistFromApi();
 
-      setShowEditModal(false);
+      // Force re-render to show new thumbnail
+      setRefreshKey((prev) => prev + 1);
 
       // If name changed, update the URL
       if (editName.trim() !== playlist.name) {
@@ -261,6 +304,7 @@ const PlaylistScreen = () => {
     setShowEditModal(false);
     setEditName("");
     setEditDescription("");
+    setEditThumbnail(null);
   };
 
   const handleDeletePlaylist = () => {
@@ -371,9 +415,7 @@ const PlaylistScreen = () => {
               {/* Edit Button */}
               {!playlist.isDefault && apiPlaylist?._id && (
                 <TouchableOpacity
-                  onPress={() =>
-                    router.push(`/(tabs)/playlists/edit?playlistId=${apiPlaylist._id}`)
-                  }
+                  onPress={handleEditPlaylist}
                   style={{
                     width: 40,
                     height: 40,
@@ -442,7 +484,20 @@ const PlaylistScreen = () => {
             {/* Playlist Header with Thumbnail */}
             <View style={{ alignItems: "center", marginBottom: 24 }}>
               {/* Playlist Thumbnail */}
-              {playlist.tracks.length > 0 ? (
+              {apiPlaylist?.coverImageUrl ? (
+                <Image
+                  source={{
+                    uri: `${apiPlaylist.coverImageUrl}?t=${Date.now()}&r=${refreshKey}`, // Add timestamp and refresh key
+                  }}
+                  style={{
+                    width: 232,
+                    height: 232,
+                    borderRadius: 8,
+                    marginBottom: 24,
+                  }}
+                  resizeMode="cover"
+                />
+              ) : playlist.tracks.length > 0 ? (
                 <Image
                   source={{ uri: playlist.tracks[0].thumbnailUrl }}
                   style={{
@@ -602,75 +657,6 @@ const PlaylistScreen = () => {
               onSongRemoved={loadPlaylistFromApi}
             />
           </LinearGradient>
-
-          {/* Recommended Section */}
-          {/* <View className="px-4 mt-8" style={{ backgroundColor: "#000000" }}> */}
-          {/* <Text
-              style={{
-                fontSize: 20,
-                fontWeight: "600",
-                color: "#fff",
-                marginBottom: 16,
-              }}
-            >
-              Recommended for you
-            </Text> */}
-
-          {/* Sample recommended item */}
-          {/* <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 8,
-                backgroundColor: "rgba(255,255,255,0.05)",
-                borderRadius: 8,
-                paddingHorizontal: 12,
-              }}
-            >
-              <View
-                style={{
-                  width: 56,
-                  height: 56,
-                  backgroundColor: "rgba(255,255,255,0.1)",
-                  borderRadius: 4,
-                  marginRight: 12,
-                }}
-              />
-              <View className="flex-1">
-                <Text
-                  style={{
-                    fontSize: 16,
-                    color: "#fff",
-                    fontWeight: "500",
-                    marginBottom: 2,
-                  }}
-                >
-                  Lời Tự Trái Tim Anh
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 14,
-                    color: "rgba(255,255,255,0.7)",
-                  }}
-                >
-                  🎵 Phan Mạnh Quỳnh
-                </Text>
-              </View>
-
-              <View className="flex-row items-center gap-3">
-                <TouchableOpacity>
-                  <Ionicons
-                    name="add-circle-outline"
-                    size={24}
-                    color="rgba(255,255,255,0.7)"
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity>
-                  <Ionicons name="play-circle" size={24} color="rgba(255,255,255,0.7)" />
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity> */}
-          {/* </View> */}
         </ScrollView>
       </LinearGradient>
 
@@ -743,16 +729,35 @@ const PlaylistScreen = () => {
                     alignItems: "center",
                     justifyContent: "center",
                     marginBottom: 16,
+                    overflow: "hidden",
                   }}
                 >
-                  <Ionicons
-                    name="musical-notes"
-                    size={80}
-                    color="rgba(255,255,255,0.6)"
-                  />
+                  {editThumbnail ? (
+                    <Image
+                      source={{ uri: editThumbnail }}
+                      style={{ width: "100%", height: "100%" }}
+                      resizeMode="cover"
+                    />
+                  ) : apiPlaylist?.coverImageUrl ? (
+                    <Image
+                      source={{
+                        uri: `${
+                          apiPlaylist.coverImageUrl
+                        }?t=${Date.now()}&r=${refreshKey}`,
+                      }}
+                      style={{ width: "100%", height: "100%" }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Ionicons
+                      name="musical-notes"
+                      size={80}
+                      color="rgba(255,255,255,0.6)"
+                    />
+                  )}
                 </TouchableOpacity>
 
-                <TouchableOpacity>
+                <TouchableOpacity onPress={pickImage}>
                   <Text
                     style={{
                       fontSize: 16,
