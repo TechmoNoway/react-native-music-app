@@ -47,7 +47,12 @@ export const updatePlaylistAsync = createAsyncThunk(
     updateData,
   }: {
     playlistId: string;
-    updateData: { name?: string; description?: string; coverImageUrl?: string };
+    updateData: {
+      name?: string;
+      description?: string;
+      coverImageUrl?: string;
+      thumbnailUri?: string;
+    };
   }) => {
     const response = await playlistService.updatePlaylist(playlistId, updateData);
     return response.playlist;

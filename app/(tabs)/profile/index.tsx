@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../../../constants/tokens";
 
 const profileSections = [
@@ -27,10 +26,7 @@ const profileSections = [
   },
   {
     title: "Preferences",
-    items: [
-      { icon: "moon-outline", label: "Dark Mode", action: "toggle" },
-      // { icon: "notifications-outline", label: "Notifications", action: "navigate" },
-    ],
+    items: [{ icon: "moon-outline", label: "Dark Mode", action: "toggle" }],
   },
   {
     title: "Support",
@@ -43,7 +39,6 @@ const profileSections = [
 ];
 
 export default function ProfileScreen() {
-  const { top } = useSafeAreaInsets();
   const [darkMode, setDarkMode] = useState(true);
   const router = useRouter();
   const { user, logout } = useUser();
@@ -90,6 +85,13 @@ export default function ProfileScreen() {
   }, [user, fetchProfile, handleLogout]);
 
   const renderProfileItem = (item: any, index: number) => {
+    const handlePress = () => {
+      if (item.label === "Edit Profile") {
+        router.push("/(tabs)/profile/edit");
+      }
+      // Handle other navigation items here
+    };
+
     return (
       <TouchableOpacity
         key={index}
@@ -102,6 +104,7 @@ export default function ProfileScreen() {
           borderBottomWidth: 1,
           borderBottomColor: colors.border,
         }}
+        onPress={item.action === "navigate" ? handlePress : undefined}
       >
         <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
           <Ionicons name={item.icon} size={24} color={colors.primary} />

@@ -243,7 +243,12 @@ export const useApiPlaylists = () => {
 
   const updatePlaylist = (
     playlistId: string,
-    updateData: { name?: string; description?: string; coverImageUrl?: string }
+    updateData: {
+      name?: string;
+      description?: string;
+      coverImageUrl?: string;
+      thumbnailUri?: string;
+    }
   ) => {
     return dispatch(updatePlaylistAsync({ playlistId, updateData }));
   };

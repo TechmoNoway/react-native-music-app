@@ -368,6 +368,25 @@ const PlaylistScreen = () => {
               >
                 {playlist.name}
               </Text>
+              {/* Edit Button */}
+              {!playlist.isDefault && apiPlaylist?._id && (
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push(`/(tabs)/playlists/edit?playlistId=${apiPlaylist._id}`)
+                  }
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: "rgba(255,255,255,0.2)",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginRight: 8,
+                  }}
+                >
+                  <Ionicons name="pencil" size={16} color="white" />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 onPress={handlePlayPlaylist}
                 style={{

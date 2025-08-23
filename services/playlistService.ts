@@ -8,6 +8,7 @@ import {
 import { Track } from "@/types/audio";
 import { storage, StorageKeys } from "@/utils/storage";
 import axios from "axios";
+import { ImageUploadService } from "./imageUploadService";
 
 const API_BASE_URL = "https://nodejs-music-app-backend.vercel.app/api";
 
@@ -223,22 +224,74 @@ class PlaylistService {
     }
   }
 
-  // Helper method to update playlist metadata
+  // Helper method to update playlist metadata with thumbnail support
   async updatePlaylist(
     playlistId: string,
-    updateData: Partial<CreatePlaylistRequest>
+    updateData: Partial<CreatePlaylistRequest> & { thumbnailUri?: string }
   ): Promise<{ playlist: PlaylistApiResponse }> {
     try {
-      const response = await this.apiClient.put<GetPlaylistResponse>(
-        `/playlists/${playlistId}`,
-        updateData
-      );
+      // If thumbnail is a local file, upload it first using multipart/form-data
+      if (
+        updateData.thumbnailUri &&
+        ImageUploadService.isLocalFile(updateData.thumbnailUri)
+      ) {
+        try {
+          const authToken = await storage.getItem(StorageKeys.AUTH_TOKEN);
+          if (!authToken) {
+            throw new Error("No auth token found");
+          }
 
-      if (response.data.success) {
-        return { playlist: response.data.data.playlist };
+          // Create FormData for multipart upload
+          const formData = new FormData();
+
+          // Add other fields
+          if (updateData.name) formData.append("name", updateData.name);
+          if (updateData.description)
+            formData.append("description", updateData.description);
+
+          // Add thumbnail file
+          const fileInfo = {
+            uri: updateData.thumbnailUri,
+            type: "image/jpeg",
+            name: `playlist_thumbnail_${Date.now()}.jpg`,
+          };
+          formData.append("thumbnail", fileInfo as any);
+
+          // Use fetch for multipart upload
+          const response = await fetch(`${API_BASE_URL}/playlists/${playlistId}`, {
+            method: "PUT",
+            body: formData,
+            headers: {
+              "Content-Type": "multipart/form-data",
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            return { playlist: data.data.playlist };
+          } else {
+            throw new Error(data.message || "Failed to update playlist");
+          }
+        } catch (uploadError) {
+          console.error("Error uploading playlist thumbnail:", uploadError);
+          throw uploadError;
+        }
+      } else {
+        // Regular update without thumbnail upload
+        const { thumbnailUri, ...restData } = updateData;
+        const response = await this.apiClient.put<GetPlaylistResponse>(
+          `/playlists/${playlistId}`,
+          restData
+        );
+
+        if (response.data.success) {
+          return { playlist: response.data.data.playlist };
+        }
+
+        throw new Error(response.data.message || "Failed to update playlist");
       }
-
-      throw new Error(response.data.message || "Failed to update playlist");
     } catch (error) {
       console.error("Error updating playlist:", error);
       throw error;
