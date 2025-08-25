@@ -22,7 +22,7 @@ const PlaylistsScreenLayout = () => {
         <Stack.Screen
           name="[name]"
           options={{
-            headerShown: false, // Tắt hoàn toàn header cho detail screen
+            headerShown: false,
           }}
         />
       </Stack>

@@ -346,7 +346,6 @@ const PlaylistScreen = () => {
     }
 
     try {
-      // Set the queue to playlist tracks and start playing from the beginning
       await AudioService.setQueue(playlist.tracks);
       await AudioService.playFromQueue(0, false);
     } catch (error) {
@@ -362,7 +361,6 @@ const PlaylistScreen = () => {
     }
 
     try {
-      // Set the queue to playlist tracks and start playing with shuffle
       await AudioService.setQueue(playlist.tracks);
       await AudioService.playFromQueue(0, true);
     } catch (error) {

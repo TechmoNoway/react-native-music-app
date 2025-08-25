@@ -1,6 +1,5 @@
 import { useUser } from "@/hooks/useUser";
 import { useUserProfile } from "@/hooks/useUserProfile";
-import { ImageUploadService } from "@/services/imageUploadService";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -23,16 +22,40 @@ export default function EditProfileScreen() {
   const { top } = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useUser();
-  const { profileData, updateProfile, isLoading } = useUserProfile();
+  const { profileData, updateProfile, fetchProfile, isLoading } = useUserProfile();
 
-  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Fetch profile data when component mounts
   useEffect(() => {
+    console.log("Fetching profile data...");
+    fetchProfile();
+  }, [fetchProfile]);
+
+  useEffect(() => {
+    console.log("User data:", user);
+    console.log("Profile data:", profileData);
+
     if (profileData) {
-      setName(profileData.name || profileData.username || user?.name || "");
+      console.log("Using profile data:", {
+        username: profileData.username,
+        email: profileData.email,
+        avatar: profileData.avatar,
+      });
+      setUsername(profileData.username || user?.username || "");
+      setEmail(profileData.email || user?.email || "");
       setAvatar(profileData.avatar || null);
+    } else if (user) {
+      // Fallback to user data if profileData is not available
+      console.log("Using user data as fallback:", {
+        username: user.username,
+        email: user.email,
+      });
+      setUsername(user.username || "");
+      setEmail(user.email || "");
     }
   }, [profileData, user]);
 
@@ -49,7 +72,7 @@ export default function EditProfileScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -65,55 +88,39 @@ export default function EditProfileScreen() {
   };
 
   const handleSave = async () => {
-    if (!name.trim()) {
-      Alert.alert("Error", "Name is required");
+    if (!username.trim()) {
+      Alert.alert("Error", "Username is required");
+      return;
+    }
+
+    if (!email.trim()) {
+      Alert.alert("Error", "Email is required");
       return;
     }
 
     try {
       setIsUploading(true);
-
-      let avatarToSave = avatar;
-
-      // If avatar is a local file, upload it first
-      if (avatar && ImageUploadService.isLocalFile(avatar)) {
-        try {
-          console.log("Uploading new avatar...");
-          // You can choose between Cloudinary or your backend
-          avatarToSave = await ImageUploadService.uploadAvatar(avatar);
-          console.log("Avatar uploaded successfully:", avatarToSave);
-        } catch (uploadError) {
-          console.error("Error uploading avatar:", uploadError);
-          Alert.alert(
-            "Upload Error",
-            "Failed to upload avatar. Continue without changing avatar?",
-            [
-              { text: "Cancel", style: "cancel" },
-              {
-                text: "Continue",
-                onPress: () => {
-                  // Continue with existing avatar
-                  avatarToSave = profileData?.avatar || undefined;
-                },
-              },
-            ]
-          );
-          return;
-        }
-      }
-
       await updateProfile({
-        username: name.trim(),
-        avatar: avatarToSave || undefined,
+        username: username.trim(),
+        email: email.trim(),
+        avatar: avatar || undefined,
       });
 
+      // updateProfile already updates the cache, no need to fetch again
+      console.log("Profile updated successfully");
+
       Alert.alert("Success", "Profile updated successfully", [
-        { text: "OK", onPress: () => router.back() },
+        {
+          text: "OK",
+          onPress: () => {
+            // Navigate back with a flag to indicate refresh is needed
+            router.back();
+          },
+        },
       ]);
     } catch (error) {
       console.error("Error updating profile:", error);
 
-      // Handle specific error messages from API
       if (error instanceof Error) {
         const errorMessage = error.message;
         if (errorMessage.includes("Username already taken")) {
@@ -133,8 +140,6 @@ export default function EditProfileScreen() {
       setIsUploading(false);
     }
   };
-
-  const suggestedNames = ["Techmo", "Techno", "Technology"];
 
   return (
     <KeyboardAvoidingView
@@ -186,6 +191,15 @@ export default function EditProfileScreen() {
       </View>
 
       <ScrollView style={{ flex: 1 }}>
+        {/* Loading indicator */}
+        {isLoading && !profileData && (
+          <View style={{ alignItems: "center", paddingVertical: 20 }}>
+            <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+              Loading profile data...
+            </Text>
+          </View>
+        )}
+
         {/* Profile Picture Section */}
         <View style={{ alignItems: "center", paddingVertical: 30 }}>
           <TouchableOpacity onPress={pickImage} style={{ position: "relative" }}>
@@ -255,8 +269,8 @@ export default function EditProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Name Input Section */}
-        <View style={{ paddingHorizontal: 20 }}>
+        {/* Username Input Section */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
           <Text
             style={{
               fontSize: 16,
@@ -265,13 +279,13 @@ export default function EditProfileScreen() {
               marginBottom: 12,
             }}
           >
-            Name
+            Username
           </Text>
 
           <View style={{ position: "relative" }}>
             <TextInput
-              value={name}
-              onChangeText={setName}
+              value={username}
+              onChangeText={setUsername}
               style={{
                 backgroundColor: colors.backgroundCard,
                 borderRadius: 8,
@@ -281,16 +295,19 @@ export default function EditProfileScreen() {
                 color: colors.text,
                 paddingRight: 50,
                 borderWidth: 1,
-                borderColor: name.length > 0 ? colors.primary : colors.border,
+                borderColor: username.length > 0 ? colors.primary : colors.border,
               }}
-              placeholder="Enter your name"
+              placeholder={
+                profileData?.username || user?.username || "Enter your username"
+              }
               placeholderTextColor={colors.textMuted}
               maxLength={50}
+              autoCapitalize="none"
             />
 
-            {name.length > 0 && (
+            {username.length > 0 && (
               <TouchableOpacity
-                onPress={() => setName("")}
+                onPress={() => setUsername("")}
                 style={{
                   position: "absolute",
                   right: 16,
@@ -315,44 +332,76 @@ export default function EditProfileScreen() {
                 width: 8,
                 height: 8,
                 borderRadius: 4,
-                backgroundColor: name.length > 0 ? colors.primary : colors.textMuted,
+                backgroundColor: username.length > 0 ? colors.primary : colors.textMuted,
               }}
             />
           </View>
         </View>
 
-        {/* Suggested Names */}
-        <View style={{ paddingHorizontal: 20, marginTop: 30 }}>
-          <View
+        {/* Email Input Section */}
+        <View style={{ paddingHorizontal: 20 }}>
+          <Text
             style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              gap: 12,
+              fontSize: 16,
+              fontWeight: "600",
+              color: colors.text,
+              marginBottom: 12,
             }}
           >
-            {suggestedNames.map((suggestion, index) => (
+            Email
+          </Text>
+
+          <View style={{ position: "relative" }}>
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              style={{
+                backgroundColor: colors.backgroundCard,
+                borderRadius: 8,
+                paddingHorizontal: 16,
+                paddingVertical: 16,
+                fontSize: 16,
+                color: colors.text,
+                paddingRight: 50,
+                borderWidth: 1,
+                borderColor: email.length > 0 ? colors.primary : colors.border,
+              }}
+              placeholder={profileData?.email || user?.email || "Enter your email"}
+              placeholderTextColor={colors.textMuted}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            {email.length > 0 && (
               <TouchableOpacity
-                key={index}
-                onPress={() => setName(suggestion)}
+                onPress={() => setEmail("")}
                 style={{
-                  backgroundColor: colors.backgroundCard,
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 20,
-                  borderWidth: 1,
-                  borderColor: name === suggestion ? colors.primary : "transparent",
+                  position: "absolute",
+                  right: 16,
+                  top: 18,
+                  width: 20,
+                  height: 20,
+                  borderRadius: 10,
+                  backgroundColor: colors.textMuted,
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
-                <Text
-                  style={{
-                    color: name === suggestion ? colors.primary : colors.text,
-                    fontSize: 14,
-                  }}
-                >
-                  {suggestion}
-                </Text>
+                <Ionicons name="close" size={12} color={colors.background} />
               </TouchableOpacity>
-            ))}
+            )}
+          </View>
+
+          {/* Character count indicator */}
+          <View style={{ alignItems: "flex-end", marginTop: 4 }}>
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: email.length > 0 ? colors.primary : colors.textMuted,
+              }}
+            />
           </View>
         </View>
       </ScrollView>

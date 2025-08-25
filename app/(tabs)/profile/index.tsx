@@ -1,7 +1,7 @@
 import { useUser } from "@/hooks/useUser";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -45,6 +45,9 @@ export default function ProfileScreen() {
   const { profileData, isLoading: isLoadingProfile, fetchProfile } = useUserProfile();
   const hasLoadedProfile = useRef(false);
   const currentUserId = useRef<string | number | null>(null);
+  const lastRefreshTime = useRef<number>(0);
+  const isRefreshing = useRef(false);
+  const hasFocusedBefore = useRef(false); // Track if we've focused before
 
   const handleLogout = useCallback(async () => {
     try {
@@ -56,6 +59,60 @@ export default function ProfileScreen() {
     }
   }, [logout, router]);
 
+  // Debounced profile refresh to prevent spam
+  const refreshProfile = useCallback(
+    async (force = false) => {
+      if (!user || !user.id) return;
+
+      // Prevent multiple simultaneous refreshes
+      if (isRefreshing.current) {
+        console.log("Profile refresh already in progress, skipping");
+        return;
+      }
+
+      // Debounce: Don't refresh if we just refreshed within 2 seconds
+      const now = Date.now();
+      if (!force && now - lastRefreshTime.current < 2000) {
+        console.log("Profile refresh throttled (too recent)");
+        return;
+      }
+
+      try {
+        isRefreshing.current = true;
+        lastRefreshTime.current = now;
+        console.log("Refreshing profile data...");
+        await fetchProfile(force);
+      } catch (error) {
+        console.error("Error refreshing profile:", error);
+        if (error instanceof Error && error.message === "Authentication expired") {
+          Alert.alert("Session Expired", "Please login again.", [
+            { text: "OK", onPress: handleLogout },
+          ]);
+        }
+      } finally {
+        isRefreshing.current = false;
+      }
+    },
+    [user, fetchProfile, handleLogout]
+  );
+
+  // Reload profile when screen is focused (only after first time)
+  useFocusEffect(
+    useCallback(() => {
+      console.log("Profile screen focused");
+
+      // Only refresh on subsequent focuses (skip initial focus)
+      if (hasFocusedBefore.current) {
+        console.log("Refreshing profile on return focus");
+        refreshProfile(false); // Use throttled refresh
+      } else {
+        console.log("Initial focus, skipping refresh");
+        hasFocusedBefore.current = true;
+      }
+    }, [refreshProfile])
+  );
+
+  // Initial profile load
   useEffect(() => {
     const loadProfile = async () => {
       if (!user || !user.id) return;
@@ -68,28 +125,18 @@ export default function ProfileScreen() {
       if (hasLoadedProfile.current) return;
 
       hasLoadedProfile.current = true;
-      try {
-        await fetchProfile();
-      } catch (error) {
-        console.error("Error loading profile:", error);
-        hasLoadedProfile.current = false;
-        if (error instanceof Error && error.message === "Authentication expired") {
-          Alert.alert("Session Expired", "Please login again.", [
-            { text: "OK", onPress: handleLogout },
-          ]);
-        }
-      }
+      console.log("Initial profile load");
+      await refreshProfile(false); // Use debounced function
     };
 
     loadProfile();
-  }, [user, fetchProfile, handleLogout]);
+  }, [user, refreshProfile]);
 
   const renderProfileItem = (item: any, index: number) => {
     const handlePress = () => {
       if (item.label === "Edit Profile") {
         router.push("/(tabs)/profile/edit");
       }
-      // Handle other navigation items here
     };
 
     return (

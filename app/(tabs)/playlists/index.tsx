@@ -115,7 +115,6 @@ const PlaylistsScreen = () => {
     }
 
     try {
-      // Create the playlist using the API
       await createApiPlaylist({
         name: newPlaylistName.trim(),
         description: "",
@@ -125,10 +124,8 @@ const PlaylistsScreen = () => {
       setShowCreateDialog(false);
       setNewPlaylistName("");
 
-      // Refresh playlists to show the new one
       onRefresh();
 
-      // Navigate to the new playlist
       setTimeout(() => {
         router.push(`/(tabs)/playlists/${newPlaylistName.trim()}`);
       }, 100);

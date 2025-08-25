@@ -43,7 +43,6 @@ const SongsScreen = () => {
       }
 
       const songs = response.tracks || [];
-      console.log("Songs array:", songs);
       const transformedSongs: Track[] = songs.map((item: any) => ({
         _id: item._id || `song_${Math.random()}`,
         title: item.title || "Unknown Song",
@@ -64,7 +63,6 @@ const SongsScreen = () => {
         updatedAt: item.updatedAt || new Date().toISOString(),
       }));
 
-      console.log("Transformed songs:", transformedSongs);
       setSongs(transformedSongs);
     } catch (err) {
       console.error("Error fetching songs:", err);
