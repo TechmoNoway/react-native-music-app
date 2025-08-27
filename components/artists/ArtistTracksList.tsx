@@ -3,13 +3,17 @@ import { TracksList } from "@/components/songs/TracksList";
 import { unknownArtistImageUri } from "@/constants/images";
 import { trackTitleFilter } from "@/helpers/filter";
 import { generateTracksListId } from "@/helpers/miscellaneous";
-import { Artist } from "@/helpers/types";
+import { ArtistWithTracks } from "@/helpers/types";
 import { useNavigationSearch } from "@/hooks/useNavigationSearch";
 import { Image } from "expo-image";
 import { useMemo } from "react";
 import { Text, View } from "react-native";
 
-export const ArtistTracksList = ({ artist }: { artist: Artist }) => {
+export const ArtistTracksList = ({
+  artist,
+}: {
+  artist: ArtistWithTracks & { imageUrl?: string };
+}) => {
   const search = useNavigationSearch({
     searchBarOptions: {
       hideWhenScrolling: true,
@@ -32,7 +36,7 @@ export const ArtistTracksList = ({ artist }: { artist: Artist }) => {
           <View className="flex-row justify-center h-48">
             <Image
               source={{
-                uri: unknownArtistImageUri,
+                uri: artist.imageUrl || unknownArtistImageUri,
               }}
               style={{
                 width: "60%",

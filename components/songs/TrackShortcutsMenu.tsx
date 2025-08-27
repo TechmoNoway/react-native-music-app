@@ -47,9 +47,7 @@ export const TrackShortcutsMenu = ({
   const { user } = useUser();
   const { removeSongFromPlaylist } = useApiPlaylists();
 
-  // Get user ID - same logic as FavoriteButton for consistency
   const getUserId = () => {
-    // Temporarily hardcode the user ID for testing
     const hardcodedUserId = "689c790732d9912b9f9347b2";
 
     if (!user) {
@@ -62,7 +60,6 @@ export const TrackShortcutsMenu = ({
 
   const currentUserId = getUserId();
 
-  // Check if current user has liked this song
   const isFavorite = isTrackLiked(track, currentUserId);
 
   const { toggleTrackFavorite } = useFavorites();
@@ -71,7 +68,7 @@ export const TrackShortcutsMenu = ({
   const handlePressAction = async (id: string) => {
     setModalVisible(false);
 
-    if (isLoading) return; // Prevent multiple simultaneous actions
+    if (isLoading) return;
 
     try {
       setIsLoading(true);
@@ -79,7 +76,6 @@ export const TrackShortcutsMenu = ({
       switch (id) {
         case "add-to-favorites":
           try {
-            // Update track's likedBy array locally first for immediate UI update
             if (currentUserId && track.likedBy) {
               track.likedBy.push(currentUserId.toString());
               track.likesCount = (track.likesCount || 0) + 1;
@@ -87,23 +83,22 @@ export const TrackShortcutsMenu = ({
 
             const result = await playlistService.likeSong(track);
 
-            // Update with actual count from server
             if (result.likesCount !== undefined) {
               track.likesCount = result.likesCount;
             }
 
-            toggleTrackFavorite(track); // Update local state
+            toggleTrackFavorite(track);
 
-            Alert.alert("Success", getLikeSuccessMessage(false), [{ text: "OK" }]);
+            Alert.alert("Success", getLikeSuccessMessage(true), [{ text: "OK" }]);
 
-            // if the tracks is in the favorite queue, add it
             if (activeQueueId?.startsWith("favorites")) {
               await AudioService.add(track);
             }
+
+            onSongRemoved?.();
           } catch (error) {
             console.error("Error adding to favorites:", error);
 
-            // Revert local changes on error
             if (currentUserId && track.likedBy) {
               track.likedBy = track.likedBy.filter(
                 (id) => id !== currentUserId.toString()
@@ -111,13 +106,12 @@ export const TrackShortcutsMenu = ({
               track.likesCount = Math.max(0, (track.likesCount || 1) - 1);
             }
 
-            Alert.alert("Error", getLikeErrorMessage(false), [{ text: "OK" }]);
+            Alert.alert("Error", getLikeErrorMessage(true), [{ text: "OK" }]);
           }
           break;
 
         case "remove-from-favorites":
           try {
-            // Update track's likedBy array locally first for immediate UI update
             if (currentUserId && track.likedBy) {
               track.likedBy = track.likedBy.filter(
                 (id) => id !== currentUserId.toString()
@@ -127,14 +121,12 @@ export const TrackShortcutsMenu = ({
 
             const result = await playlistService.unlikeSong(track);
 
-            // Update with actual count from server
             if (result.likesCount !== undefined) {
               track.likesCount = result.likesCount;
             }
 
-            toggleTrackFavorite(track); // Update local state
+            toggleTrackFavorite(track);
 
-            // if the track is in the favorites queue, we need to remove it
             if (activeQueueId?.startsWith("favorites")) {
               const queue = await AudioService.getQueue();
 
@@ -145,22 +137,23 @@ export const TrackShortcutsMenu = ({
               await AudioService.remove(trackToRemove);
             }
 
-            Alert.alert("Success", getLikeSuccessMessage(true), [{ text: "OK" }]);
+            Alert.alert("Success", getLikeSuccessMessage(false), [{ text: "OK" }]);
+
+            // If we're in a playlist context (especially Liked Songs), reload the playlist
+            onSongRemoved?.();
           } catch (error) {
             console.error("Error removing from favorites:", error);
 
-            // Revert local changes on error
             if (currentUserId && track.likedBy) {
               track.likedBy.push(currentUserId.toString());
               track.likesCount = (track.likesCount || 0) + 1;
             }
 
-            Alert.alert("Error", getLikeErrorMessage(true), [{ text: "OK" }]);
+            Alert.alert("Error", getLikeErrorMessage(false), [{ text: "OK" }]);
           }
           break;
 
         case "add-to-playlist":
-          // it opens the addToPlaylist modal
           router.push({
             pathname: "/(modals)/addToPlaylist",
             params: { trackUrl: track.fileUrl },
@@ -172,7 +165,6 @@ export const TrackShortcutsMenu = ({
             try {
               await removeSongFromPlaylist(context.playlistId, track._id);
               Alert.alert("Success", "Song removed from playlist", [{ text: "OK" }]);
-              // Call the callback to refresh the playlist
               onSongRemoved?.();
             } catch (error) {
               console.error("Error removing song from playlist:", error);

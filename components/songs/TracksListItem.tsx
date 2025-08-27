@@ -12,12 +12,10 @@ import { Text, TouchableHighlight, View } from "react-native";
 export type TracksListItemProps = {
   track: Track;
   onTrackSelect: (track: Track) => void;
-  // Add context prop for playlist context
   context?: {
     type: "playlist";
     playlistId: string;
   };
-  // Callback for when song is removed from playlist
   onSongRemoved?: () => void;
 };
 

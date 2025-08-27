@@ -1,9 +1,5 @@
 import { Track } from "@/types/audio";
 
-/**
- * Check if a track is liked by the current user
- * Priority: check likedBy array > isLiked field from API > fallback to rating
- */
 export const isTrackLiked = (track: Track, userId?: string | number): boolean => {
   if (track.likedBy && userId) {
     const isLikedByUser = track.likedBy.some((likedUserId: string) => {
@@ -12,7 +8,7 @@ export const isTrackLiked = (track: Track, userId?: string | number): boolean =>
     return isLikedByUser;
   }
   return track.rating === 1;
-};
+}; 
 
 /**
  * Get the display text for like/unlike action
