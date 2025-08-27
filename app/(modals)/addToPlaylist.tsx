@@ -23,15 +23,13 @@ const AddToPlaylistModal = () => {
 
   const track = tracks.find((currentTrack) => trackUrl === currentTrack.fileUrl);
 
-  // track was not found
   if (!track) {
     return null;
   }
 
   const handlePlaylistPress = async (playlist: PlaylistApiResponse) => {
-    if (isLoading) return; // Prevent multiple clicks
+    if (isLoading) return;
 
-    // Check if track is already in the playlist
     const isTrackInPlaylist = playlist.songs.some((song) => song._id === track._id);
 
     if (isTrackInPlaylist) {
@@ -43,15 +41,13 @@ const AddToPlaylistModal = () => {
       setIsLoading(true);
       setAddingPlaylistName(playlist.name);
 
-      // Call API to add song to playlist
       await playlistService.addSongToPlaylist(playlist._id, {
         songId: track._id,
       });
 
-      // Show success message briefly before dismissing
       setTimeout(() => {
         router.dismiss();
-      }, 1000); // Wait 1 second to show success state
+      }, 1000);
     } catch (error) {
       console.error("Error adding to playlist:", error);
       Alert.alert("Error", "Failed to add song to playlist. Please try again.", [

@@ -21,7 +21,6 @@ export const PlayerProgressbar = ({ style }: PlayerProgressbarProps) => {
   const trackElapsedTime = formatSecondsToMinutes(position);
   const trackRemainingTime = formatSecondsToMinutes(duration - position);
 
-  // Use useEffect to avoid accessing .value during render
   useEffect(() => {
     progress.value = duration > 0 ? position / duration : 0;
   }, [position, duration, progress]);

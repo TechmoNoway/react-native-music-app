@@ -18,7 +18,6 @@ export const VolumeControl = ({ iconSize = 28 }: VolumeControlProps) => {
   const min = useSharedValue(0);
   const max = useSharedValue(1);
 
-  // Update progress when volume changes
   useEffect(() => {
     if (volume !== undefined) {
       progress.value = volume;

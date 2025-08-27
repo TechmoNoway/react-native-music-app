@@ -15,7 +15,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 
-// Import types and constants
 import { API_CONFIG, API_ENDPOINTS, LOGIN_METHODS } from "@/constants/api";
 import type { RegisterResponse } from "@/types/api";
 

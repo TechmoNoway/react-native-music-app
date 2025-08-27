@@ -29,7 +29,6 @@ export default function EditProfileScreen() {
   const [avatar, setAvatar] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Fetch profile data when component mounts
   useEffect(() => {
     console.log("Fetching profile data...");
     fetchProfile();
@@ -49,7 +48,6 @@ export default function EditProfileScreen() {
       setEmail(profileData.email || user?.email || "");
       setAvatar(profileData.avatar || null);
     } else if (user) {
-      // Fallback to user data if profileData is not available
       console.log("Using user data as fallback:", {
         username: user.username,
         email: user.email,
@@ -106,14 +104,12 @@ export default function EditProfileScreen() {
         avatar: avatar || undefined,
       });
 
-      // updateProfile already updates the cache, no need to fetch again
       console.log("Profile updated successfully");
 
       Alert.alert("Success", "Profile updated successfully", [
         {
           text: "OK",
           onPress: () => {
-            // Navigate back with a flag to indicate refresh is needed
             router.back();
           },
         },
