@@ -8,6 +8,7 @@ import {
 import { Track } from "@/types/audio";
 import { storage, StorageKeys } from "@/utils/storage";
 import axios from "axios";
+import { ImageUploadService } from "./imageUploadService";
 
 const API_BASE_URL = "https://nodejs-music-app-backend.vercel.app/api";
 
@@ -22,7 +23,6 @@ class PlaylistService {
   }
 
   private setupInterceptors() {
-    // Add auth token to requests
     this.apiClient.interceptors.request.use(async (config) => {
       try {
         const token = await storage.getItem(StorageKeys.AUTH_TOKEN);
@@ -35,7 +35,6 @@ class PlaylistService {
       return config;
     });
 
-    // Handle response errors
     this.apiClient.interceptors.response.use(
       (response) => response,
       async (error) => {
@@ -57,7 +56,6 @@ class PlaylistService {
             }
           } catch (refreshError) {
             console.error("Token refresh failed:", refreshError);
-            // Clear stored tokens
             await storage.removeItem(StorageKeys.AUTH_TOKEN);
             await storage.removeItem(StorageKeys.REFRESH_TOKEN);
             await storage.removeItem(StorageKeys.USER_DATA);
@@ -69,7 +67,6 @@ class PlaylistService {
     );
   }
 
-  // Get user's playlists with optional filters
   async getUserPlaylists(filters?: {
     type?: string;
     search?: string;
@@ -93,7 +90,6 @@ class PlaylistService {
     }
   }
 
-  // Get playlist by ID
   async getPlaylistById(playlistId: string): Promise<{ playlist: PlaylistApiResponse }> {
     try {
       const response = await this.apiClient.get<GetPlaylistResponse>(
@@ -111,7 +107,6 @@ class PlaylistService {
     }
   }
 
-  // Create a new custom playlist
   async createPlaylist(
     playlistData: CreatePlaylistRequest
   ): Promise<{ playlist: PlaylistApiResponse }> {
@@ -132,7 +127,6 @@ class PlaylistService {
     }
   }
 
-  // Add song to playlist (including liked songs)
   async addSongToPlaylist(
     playlistId: string,
     songData: AddSongToPlaylistRequest
@@ -154,7 +148,6 @@ class PlaylistService {
     }
   }
 
-  // Like a song using the new /songs/:id/like endpoint
   async likeSong(track: Track): Promise<{ songId: string; likesCount: number }> {
     try {
       const response = await this.apiClient.post<{
@@ -177,7 +170,6 @@ class PlaylistService {
     }
   }
 
-  // Unlike a song using the new /songs/:id/unlike endpoint
   async unlikeSong(track: Track): Promise<{ songId: string; likesCount: number }> {
     try {
       const response = await this.apiClient.post<{
@@ -232,22 +224,74 @@ class PlaylistService {
     }
   }
 
-  // Helper method to update playlist metadata
+  // Helper method to update playlist metadata with thumbnail support
   async updatePlaylist(
     playlistId: string,
-    updateData: Partial<CreatePlaylistRequest>
+    updateData: Partial<CreatePlaylistRequest> & { thumbnailUri?: string }
   ): Promise<{ playlist: PlaylistApiResponse }> {
     try {
-      const response = await this.apiClient.put<GetPlaylistResponse>(
-        `/playlists/${playlistId}`,
-        updateData
-      );
+      // If thumbnail is a local file, upload it first using multipart/form-data
+      if (
+        updateData.thumbnailUri &&
+        ImageUploadService.isLocalFile(updateData.thumbnailUri)
+      ) {
+        try {
+          const authToken = await storage.getItem(StorageKeys.AUTH_TOKEN);
+          if (!authToken) {
+            throw new Error("No auth token found");
+          }
 
-      if (response.data.success) {
-        return { playlist: response.data.data.playlist };
+          // Create FormData for multipart upload
+          const formData = new FormData();
+
+          // Add other fields
+          if (updateData.name) formData.append("name", updateData.name);
+          if (updateData.description)
+            formData.append("description", updateData.description);
+
+          // Add thumbnail file
+          const fileInfo = {
+            uri: updateData.thumbnailUri,
+            type: "image/jpeg",
+            name: `playlist_thumbnail_${Date.now()}.jpg`,
+          };
+          formData.append("thumbnail", fileInfo as any);
+
+          // Use fetch for multipart upload
+          const response = await fetch(`${API_BASE_URL}/playlists/${playlistId}`, {
+            method: "PUT",
+            body: formData,
+            headers: {
+              "Content-Type": "multipart/form-data",
+              Authorization: `Bearer ${authToken}`,
+            },
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            return { playlist: data.data.playlist };
+          } else {
+            throw new Error(data.message || "Failed to update playlist");
+          }
+        } catch (uploadError) {
+          console.error("Error uploading playlist thumbnail:", uploadError);
+          throw uploadError;
+        }
+      } else {
+        // Regular update without thumbnail upload
+        const { thumbnailUri, ...restData } = updateData;
+        const response = await this.apiClient.put<GetPlaylistResponse>(
+          `/playlists/${playlistId}`,
+          restData
+        );
+
+        if (response.data.success) {
+          return { playlist: response.data.data.playlist };
+        }
+
+        throw new Error(response.data.message || "Failed to update playlist");
       }
-
-      throw new Error(response.data.message || "Failed to update playlist");
     } catch (error) {
       console.error("Error updating playlist:", error);
       throw error;

@@ -10,6 +10,13 @@ export type TracksListProps = Partial<FlatListProps<Track>> & {
   id: string;
   tracks: Track[];
   hideQueueControls?: boolean;
+  // Add context prop for playlist context
+  context?: {
+    type: "playlist";
+    playlistId: string;
+  };
+  // Callback for when song is removed from playlist
+  onSongRemoved?: () => void;
 };
 
 const ItemDivider = () => <View style={{ height: 4 }} />;
@@ -18,6 +25,8 @@ export const TracksList = ({
   id,
   tracks,
   hideQueueControls = false,
+  context,
+  onSongRemoved,
   ...flatlistProps
 }: TracksListProps) => {
   const queueOffset = useRef(0);
@@ -132,6 +141,8 @@ export const TracksList = ({
         <TracksListItem
           track={track}
           onTrackSelect={isProcessing ? () => {} : handleTrackSelect}
+          context={context}
+          onSongRemoved={onSongRemoved}
         />
       )}
       {...flatlistProps}

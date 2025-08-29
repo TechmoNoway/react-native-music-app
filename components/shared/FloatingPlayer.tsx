@@ -5,7 +5,7 @@ import { useLastActiveTrack } from "@/hooks/useLastActiveTrack";
 import { useActiveTrack, useProgress } from "@/services/audioService";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
-import { TouchableOpacity, View, ViewProps } from "react-native";
+import { Text, TouchableOpacity, View, ViewProps } from "react-native";
 
 export const FloatingPlayer = ({ style }: ViewProps) => {
   const activeTrack = useActiveTrack();
@@ -49,11 +49,22 @@ export const FloatingPlayer = ({ style }: ViewProps) => {
             text={displayedTrack.title ?? ""}
             animationThreshold={25}
           />
+          <Text
+            style={{
+              fontSize: 14,
+              color: "#ccc",
+              paddingLeft: 10,
+            }}
+            numberOfLines={1}
+          >
+            {typeof displayedTrack.artist === "string"
+              ? displayedTrack.artist
+              : displayedTrack.artist?.name ?? "Unknown Artist"}
+          </Text>
         </View>
 
         <View className="flex-row items-center gap-5 mr-4 pl-4">
           <PlayPauseButton iconSize={24} />
-          {/* <SkipToNextButton iconSize={22} /> */}
         </View>
 
         {/* Thin progress bar at the bottom */}

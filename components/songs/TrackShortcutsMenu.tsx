@@ -9,7 +9,7 @@ import {
 import { useUser } from "@/hooks/useUser";
 import AudioService from "@/services/audioService";
 import { playlistService } from "@/services/playlistService";
-import { useFavorites, useQueue } from "@/store/hooks";
+import { useApiPlaylists, useFavorites, useQueue } from "@/store/hooks";
 import { Track } from "@/types/audio";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -24,16 +24,43 @@ import {
   View,
 } from "react-native";
 
-type TrackShortcutsMenuProps = PropsWithChildren<{ track: Track }>;
+type TrackShortcutsMenuProps = PropsWithChildren<{
+  track: Track;
+  // Add context prop to determine if we're in a playlist
+  context?: {
+    type: "playlist";
+    playlistId: string;
+  };
+  // Callback for when song is removed from playlist
+  onSongRemoved?: () => void;
+}>;
 
-export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps) => {
+export const TrackShortcutsMenu = ({
+  track,
+  children,
+  context,
+  onSongRemoved,
+}: TrackShortcutsMenuProps) => {
   const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useUser();
+  const { removeSongFromPlaylist } = useApiPlaylists();
 
-  // Check if current user has liked this song
-  const isFavorite = isTrackLiked(track, user?.id);
+  const getUserId = () => {
+    const hardcodedUserId = "689c790732d9912b9f9347b2";
+
+    if (!user) {
+      return hardcodedUserId;
+    }
+
+    const userId = user.id || (user as any)._id;
+    return userId || hardcodedUserId;
+  };
+
+  const currentUserId = getUserId();
+
+  const isFavorite = isTrackLiked(track, currentUserId);
 
   const { toggleTrackFavorite } = useFavorites();
   const { activeQueueId } = useQueue();
@@ -41,7 +68,7 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
   const handlePressAction = async (id: string) => {
     setModalVisible(false);
 
-    if (isLoading) return; // Prevent multiple simultaneous actions
+    if (isLoading) return;
 
     try {
       setIsLoading(true);
@@ -49,41 +76,57 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
       switch (id) {
         case "add-to-favorites":
           try {
+            if (currentUserId && track.likedBy) {
+              track.likedBy.push(currentUserId.toString());
+              track.likesCount = (track.likesCount || 0) + 1;
+            }
+
             const result = await playlistService.likeSong(track);
 
-            // Update track's likedBy array locally
-            if (user?.id && track.likedBy) {
-              track.likedBy.push(user.id.toString());
+            if (result.likesCount !== undefined) {
               track.likesCount = result.likesCount;
             }
 
-            toggleTrackFavorite(track); // Update local state
+            toggleTrackFavorite(track);
 
-            Alert.alert("Success", getLikeSuccessMessage(false), [{ text: "OK" }]);
+            Alert.alert("Success", getLikeSuccessMessage(true), [{ text: "OK" }]);
 
-            // if the tracks is in the favorite queue, add it
             if (activeQueueId?.startsWith("favorites")) {
               await AudioService.add(track);
             }
+
+            onSongRemoved?.();
           } catch (error) {
             console.error("Error adding to favorites:", error);
-            Alert.alert("Error", getLikeErrorMessage(false), [{ text: "OK" }]);
+
+            if (currentUserId && track.likedBy) {
+              track.likedBy = track.likedBy.filter(
+                (id) => id !== currentUserId.toString()
+              );
+              track.likesCount = Math.max(0, (track.likesCount || 1) - 1);
+            }
+
+            Alert.alert("Error", getLikeErrorMessage(true), [{ text: "OK" }]);
           }
           break;
 
         case "remove-from-favorites":
           try {
+            if (currentUserId && track.likedBy) {
+              track.likedBy = track.likedBy.filter(
+                (id) => id !== currentUserId.toString()
+              );
+              track.likesCount = Math.max(0, (track.likesCount || 1) - 1);
+            }
+
             const result = await playlistService.unlikeSong(track);
 
-            // Update track's likedBy array locally
-            if (user?.id && track.likedBy) {
-              track.likedBy = track.likedBy.filter((id) => id !== user.id.toString());
+            if (result.likesCount !== undefined) {
               track.likesCount = result.likesCount;
             }
 
-            toggleTrackFavorite(track); // Update local state
+            toggleTrackFavorite(track);
 
-            // if the track is in the favorites queue, we need to remove it
             if (activeQueueId?.startsWith("favorites")) {
               const queue = await AudioService.getQueue();
 
@@ -94,19 +137,42 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
               await AudioService.remove(trackToRemove);
             }
 
-            Alert.alert("Success", getLikeSuccessMessage(true), [{ text: "OK" }]);
+            Alert.alert("Success", getLikeSuccessMessage(false), [{ text: "OK" }]);
+
+            // If we're in a playlist context (especially Liked Songs), reload the playlist
+            onSongRemoved?.();
           } catch (error) {
             console.error("Error removing from favorites:", error);
-            Alert.alert("Error", getLikeErrorMessage(true), [{ text: "OK" }]);
+
+            if (currentUserId && track.likedBy) {
+              track.likedBy.push(currentUserId.toString());
+              track.likesCount = (track.likesCount || 0) + 1;
+            }
+
+            Alert.alert("Error", getLikeErrorMessage(false), [{ text: "OK" }]);
           }
           break;
 
         case "add-to-playlist":
-          // it opens the addToPlaylist modal
           router.push({
             pathname: "/(modals)/addToPlaylist",
             params: { trackUrl: track.fileUrl },
           });
+          break;
+
+        case "remove-from-playlist":
+          if (context?.type === "playlist" && context.playlistId) {
+            try {
+              await removeSongFromPlaylist(context.playlistId, track._id);
+              Alert.alert("Success", "Song removed from playlist", [{ text: "OK" }]);
+              onSongRemoved?.();
+            } catch (error) {
+              console.error("Error removing song from playlist:", error);
+              Alert.alert("Error", "Failed to remove song from playlist", [
+                { text: "OK" },
+              ]);
+            }
+          }
           break;
 
         default:
@@ -187,17 +253,29 @@ export const TrackShortcutsMenu = ({ track, children }: TrackShortcutsMenuProps)
 
             <TouchableOpacity
               className="flex-row items-center p-3 rounded-lg mt-2"
-              onPress={() => handlePressAction("add-to-playlist")}
+              onPress={() =>
+                handlePressAction(
+                  context?.type === "playlist"
+                    ? "remove-from-playlist"
+                    : "add-to-playlist"
+                )
+              }
               disabled={isLoading}
               style={{ opacity: isLoading ? 0.6 : 1 }}
             >
               <Ionicons
-                name="add-circle-outline"
+                name={
+                  context?.type === "playlist"
+                    ? "remove-circle-outline"
+                    : "add-circle-outline"
+                }
                 size={20}
                 color={colors.icon}
                 style={{ marginRight: 12 }}
               />
-              <Text className="text-white text-base">Add to playlist</Text>
+              <Text className="text-white text-base">
+                {context?.type === "playlist" ? "Remove this song" : "Add to playlist"}
+              </Text>
             </TouchableOpacity>
           </View>
         </Pressable>

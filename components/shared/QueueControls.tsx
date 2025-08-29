@@ -11,14 +11,12 @@ type QueueControlsProps = {
 export const QueueControls = ({ tracks, style, ...viewProps }: QueueControlsProps) => {
   const handlePlay = async () => {
     await AudioService.setQueue(tracks);
-    await AudioService.play();
+    await AudioService.playFromQueue(0, false);
   };
 
   const handleShufflePlay = async () => {
-    const shuffledTracks = [...tracks].sort(() => Math.random() - 0.5);
-
-    await AudioService.setQueue(shuffledTracks);
-    await AudioService.play();
+    await AudioService.setQueue(tracks);
+    await AudioService.playFromQueue(0, true);
   };
 
   return (

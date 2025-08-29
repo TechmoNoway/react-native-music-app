@@ -16,6 +16,9 @@ export interface Track {
   isPublic: boolean;
   playCount: number;
   uploadedBy?: string | null;
+  likedBy?: string[]; // Array of user IDs who liked this song
+  likesCount?: number; // Total number of likes
+  isLiked?: boolean; // Frontend computed field
   createdAt: string;
   updatedAt: string;
   url?: string;

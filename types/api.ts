@@ -11,7 +11,10 @@ export interface ApiResponse<T = any> {
 export interface SongsApiResponse {
   success: boolean;
   message?: string;
-  data: Track[];
+  data: {
+    songs: Track[];
+    total: number;
+  };
   pagination?: {
     currentPage: number;
     totalPages: number;
@@ -24,7 +27,10 @@ export interface SongsApiResponse {
 export interface SearchSongsResponse {
   success: boolean;
   message?: string;
-  data: Track[];
+  data: {
+    songs: Track[];
+    total: number;
+  };
   pagination?: {
     currentPage: number;
     totalPages: number;

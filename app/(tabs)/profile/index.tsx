@@ -1,7 +1,7 @@
 import { useUser } from "@/hooks/useUser";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../../../constants/tokens";
 
 const profileSections = [
@@ -27,10 +26,7 @@ const profileSections = [
   },
   {
     title: "Preferences",
-    items: [
-      { icon: "moon-outline", label: "Dark Mode", action: "toggle" },
-      // { icon: "notifications-outline", label: "Notifications", action: "navigate" },
-    ],
+    items: [{ icon: "moon-outline", label: "Dark Mode", action: "toggle" }],
   },
   {
     title: "Support",
@@ -43,13 +39,18 @@ const profileSections = [
 ];
 
 export default function ProfileScreen() {
-  const { top } = useSafeAreaInsets();
   const [darkMode, setDarkMode] = useState(true);
   const router = useRouter();
   const { user, logout } = useUser();
   const { profileData, isLoading: isLoadingProfile, fetchProfile } = useUserProfile();
+
+  console.log("ProfileScreen render - user:", user);
+  console.log("ProfileScreen render - profileData:", profileData);
   const hasLoadedProfile = useRef(false);
   const currentUserId = useRef<string | number | null>(null);
+  const lastRefreshTime = useRef<number>(0);
+  const isRefreshing = useRef(false);
+  const hasFocusedBefore = useRef(false);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -61,35 +62,88 @@ export default function ProfileScreen() {
     }
   }, [logout, router]);
 
+  const refreshProfile = useCallback(
+    async (force = false) => {
+      if (!user || !user.id) return;
+
+      if (isRefreshing.current) {
+        console.log("Profile refresh already in progress, skipping");
+        return;
+      }
+
+      const now = Date.now();
+      if (!force && now - lastRefreshTime.current < 2000) {
+        console.log("Profile refresh throttled (too recent)");
+        return;
+      }
+
+      try {
+        isRefreshing.current = true;
+        lastRefreshTime.current = now;
+        console.log("Refreshing profile data...");
+        const result = await fetchProfile(force);
+        console.log("Profile fetched successfully:", result);
+      } catch (error) {
+        console.error("Error refreshing profile:", error);
+        if (error instanceof Error && error.message === "Authentication expired") {
+          Alert.alert("Session Expired", "Please login again.", [
+            { text: "OK", onPress: handleLogout },
+          ]);
+        }
+      } finally {
+        isRefreshing.current = false;
+      }
+    },
+    [user, fetchProfile, handleLogout]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      console.log("Profile screen focused");
+
+      if (hasFocusedBefore.current) {
+        console.log("Refreshing profile on return focus");
+        refreshProfile(false);
+      } else {
+        console.log("Initial focus, skipping refresh");
+        hasFocusedBefore.current = true;
+      }
+    }, [refreshProfile])
+  );
+
   useEffect(() => {
     const loadProfile = async () => {
-      if (!user || !user.id) return;
+      console.log("useEffect loadProfile - user:", user);
+      if (!user || !user.id) {
+        console.log("No user or user.id, skipping profile load");
+        return;
+      }
 
       if (currentUserId.current !== user.id) {
         hasLoadedProfile.current = false;
         currentUserId.current = user.id;
       }
 
-      if (hasLoadedProfile.current) return;
+      if (hasLoadedProfile.current) {
+        console.log("Profile already loaded, skipping");
+        return;
+      }
 
       hasLoadedProfile.current = true;
-      try {
-        await fetchProfile();
-      } catch (error) {
-        console.error("Error loading profile:", error);
-        hasLoadedProfile.current = false;
-        if (error instanceof Error && error.message === "Authentication expired") {
-          Alert.alert("Session Expired", "Please login again.", [
-            { text: "OK", onPress: handleLogout },
-          ]);
-        }
-      }
+      console.log("Initial profile load");
+      await refreshProfile(false);
     };
 
     loadProfile();
-  }, [user, fetchProfile, handleLogout]);
+  }, [user, refreshProfile]);
 
   const renderProfileItem = (item: any, index: number) => {
+    const handlePress = () => {
+      if (item.label === "Edit Profile") {
+        router.push("/(tabs)/profile/edit");
+      }
+    };
+
     return (
       <TouchableOpacity
         key={index}
@@ -102,6 +156,7 @@ export default function ProfileScreen() {
           borderBottomWidth: 1,
           borderBottomColor: colors.border,
         }}
+        onPress={item.action === "navigate" ? handlePress : undefined}
       >
         <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
           <Ionicons name={item.icon} size={24} color={colors.primary} />
@@ -141,27 +196,53 @@ export default function ProfileScreen() {
             <ActivityIndicator size="large" color={colors.primary} />
           ) : (
             <>
+              {console.log("ProfileData:", profileData)}
+              {console.log("Avatar URL:", profileData?.avatar)}
               <View
                 style={{
-                  width: 110,
-                  height: 110,
-                  borderRadius: 48,
-                  backgroundColor: "#1a1a1a",
+                  width: 150,
+                  height: 150,
+                  borderRadius: 75,
+                  backgroundColor: "#2A1A5E",
                   alignItems: "center",
                   justifyContent: "center",
                   marginBottom: 16,
                   overflow: "hidden",
+                  borderWidth: 3,
+                  borderColor: "#4A3A8E",
                 }}
               >
-                {profileData?.avatar ? (
+                {profileData?.avatar || user?.avatar ? (
                   <Image
-                    source={{ uri: profileData.avatar }}
-                    style={{ width: 110, height: 110 }}
+                    source={{ uri: profileData?.avatar || user?.avatar }}
+                    style={{ width: 150, height: 150 }}
                     resizeMode="cover"
-                    className="rounded-full"
+                    onLoad={() => console.log("Avatar loaded successfully")}
+                    onError={(error) => console.log("Avatar load error:", error)}
                   />
                 ) : (
-                  <Ionicons name="person" size={40} color={colors.textMuted} />
+                  <View
+                    style={{
+                      width: 150,
+                      height: 150,
+                      backgroundColor: "#2A1A5E",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      position: "relative",
+                    }}
+                  >
+                    {/* Gradient overlay simulation */}
+                    <View
+                      style={{
+                        position: "absolute",
+                        width: 150,
+                        height: 150,
+                        backgroundColor: "#4A3A8E",
+                        opacity: 0.6,
+                      }}
+                    />
+                    <Ionicons name="person" size={60} color="#fff" />
+                  </View>
                 )}
               </View>
 

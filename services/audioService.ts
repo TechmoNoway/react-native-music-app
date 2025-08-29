@@ -136,8 +136,6 @@ class AudioService {
         throw new Error(`No valid audio URL found for track: ${track.title}`);
       }
 
-      console.log(`🎵 Loading track: ${track.title} from URL: ${trackUrl}`);
-
       if (this.sound) {
         await this.sound.unloadAsync();
       }
@@ -164,8 +162,6 @@ class AudioService {
       // Update background service with progress
       const progress = this.getProgress();
       simpleBackgroundService.updatePlaybackState(track, this.isPlaying, progress);
-
-      console.log("✅ Track loaded successfully");
     } catch (error) {
       console.error("❌ Error loading track:", error);
       console.error("❌ Error details:", JSON.stringify(error));
@@ -349,6 +345,53 @@ class AudioService {
     return this.currentTrack;
   }
 
+  // Shuffle the queue randomly
+  async shuffleQueue() {
+    if (this.queue.length <= 1) return;
+
+    const currentTrack = this.currentTrack;
+
+    // Fisher-Yates shuffle algorithm
+    for (let i = this.queue.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [this.queue[i], this.queue[j]] = [this.queue[j], this.queue[i]];
+    }
+
+    // If we have a current track, move it to the first position
+    if (currentTrack) {
+      const currentTrackIndex = this.queue.findIndex(
+        (track) => track._id === currentTrack._id
+      );
+      if (currentTrackIndex !== -1 && currentTrackIndex !== 0) {
+        // Swap current track to position 0
+        [this.queue[0], this.queue[currentTrackIndex]] = [
+          this.queue[currentTrackIndex],
+          this.queue[0],
+        ];
+      }
+      this.currentIndex = 0;
+    }
+  }
+
+  // Play from a specific position in queue with optional shuffle
+  async playFromQueue(index: number = 0, shuffle: boolean = false) {
+    if (this.queue.length === 0) return;
+
+    if (shuffle) {
+      await this.shuffleQueue();
+      // After shuffle, start from the beginning
+      index = 0;
+    }
+
+    this.currentIndex = Math.max(0, Math.min(index, this.queue.length - 1));
+    const track = this.queue[this.currentIndex];
+
+    if (track) {
+      await this.loadTrack(track);
+      await this.play();
+    }
+  }
+
   getProgress(): { position: number; duration: number } {
     return {
       position: this.position / 1000,
@@ -446,6 +489,9 @@ export default {
   getActiveTrack: () => audioService.getActiveTrack(),
   getProgress: () => audioService.getProgress(),
   getIsPlaying: () => audioService.getIsPlaying(),
+  shuffleQueue: () => audioService.shuffleQueue(),
+  playFromQueue: (index?: number, shuffle?: boolean) =>
+    audioService.playFromQueue(index, shuffle),
   addEventListener: (event: string, callback: Function) =>
     audioService.addEventListener(event, callback),
   removeEventListener: (event: string, callback: Function) =>

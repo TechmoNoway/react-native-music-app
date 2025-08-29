@@ -74,33 +74,117 @@ export class UserService {
     try {
       const headers = await this.getAuthHeaders();
 
-      const response = await axios.put<UserProfileResponse>(
-        `${API_CONFIG.BASE_URL}${API_ENDPOINTS.USER.UPDATE_PROFILE}`,
-        userData,
-        {
-          headers,
-          timeout: API_CONFIG.TIMEOUT,
-        }
-      );
+      const isLocalFile = userData.avatar && userData.avatar.startsWith("file://");
 
-      if (response.data.success && response.data.data) {
-        // Cache the result and clear previous cache
-        this.profileCache = response.data.data.user;
-        this.cacheTimestamp = Date.now();
-        return response.data.data.user;
+      if (isLocalFile) {
+        // Use fetch for multipart upload (similar to playlist service)
+        try {
+          const authToken = await storage.getItem(StorageKeys.AUTH_TOKEN);
+          if (!authToken) {
+            throw new Error("No auth token found");
+          }
+
+          // Create FormData for multipart upload
+          const formData = new FormData();
+
+          if (userData.username) {
+            formData.append("username", userData.username);
+          }
+          if (userData.email) {
+            formData.append("email", userData.email);
+          }
+
+          if (userData.avatar) {
+            const fileName = userData.avatar.split("/").pop() || "avatar.jpg";
+            const fileType = fileName.split(".").pop()?.toLowerCase() || "jpg";
+
+            const fileInfo = {
+              uri: userData.avatar,
+              type: `image/${fileType === "jpg" ? "jpeg" : fileType}`,
+              name: fileName,
+            };
+            formData.append("avatar", fileInfo as any);
+          }
+
+          console.log("Sending FormData with avatar file using fetch");
+
+          // Use fetch for multipart upload
+          const response = await fetch(
+            `${API_CONFIG.BASE_URL}${API_ENDPOINTS.USER.UPDATE_PROFILE}`,
+            {
+              method: "PUT",
+              body: formData,
+              headers: {
+                "Content-Type": "multipart/form-data",
+                Authorization: `Bearer ${authToken}`,
+              },
+            }
+          );
+
+          const data = await response.json();
+
+          if (data.success && data.data) {
+            // Clear cache and update with new data
+            this.clearCache();
+            this.profileCache = data.data.user;
+            this.cacheTimestamp = Date.now();
+            console.log("Profile cache updated after avatar upload");
+            return data.data.user;
+          } else {
+            throw new Error(data.message || "Failed to update profile");
+          }
+        } catch (uploadError) {
+          console.error("Error uploading avatar:", uploadError);
+          throw uploadError;
+        }
       } else {
-        throw new Error(response.data.message || "Failed to update profile");
+        // Use axios for JSON requests (no file upload)
+        console.log("Sending JSON data:", userData);
+
+        const response = await axios.put<UserProfileResponse>(
+          `${API_CONFIG.BASE_URL}${API_ENDPOINTS.USER.UPDATE_PROFILE}`,
+          userData,
+          {
+            headers,
+            timeout: API_CONFIG.TIMEOUT,
+          }
+        );
+
+        if (response.data.success && response.data.data) {
+          // Clear cache and update with new data
+          this.clearCache();
+          this.profileCache = response.data.data.user;
+          this.cacheTimestamp = Date.now();
+          console.log("Profile cache updated after text update");
+          return response.data.data.user;
+        } else {
+          throw new Error(response.data.message || "Failed to update profile");
+        }
       }
     } catch (error) {
       console.error("Error updating user profile:", error);
 
       if (isAxiosError(error)) {
+        console.error("Axios error details:", {
+          message: error.message,
+          code: error.code,
+          response: error.response?.data,
+          status: error.response?.status,
+        });
+
         if (error.response?.status === 401) {
           // Clear cache on auth error
           this.profileCache = null;
           this.cacheTimestamp = 0;
           throw new Error("Authentication expired");
         }
+
+        if (error.code === "NETWORK_ERROR" || error.message === "Network Error") {
+          throw new Error(
+            "Network connection failed. Please check your internet connection."
+          );
+        }
+
         throw new Error(error.response?.data?.message || "Failed to update profile");
       }
 

@@ -12,10 +12,13 @@ import {
   createPlaylist as createPlaylistAction,
   createPlaylistAsync,
   deletePlaylist as deletePlaylistAction,
+  deletePlaylistAsync,
   fetchUserPlaylists,
+  removeSongFromPlaylistAsync,
   renamePlaylist as renamePlaylistAction,
   toggleTrackFavorite as toggleTrackFavoriteAction,
   toggleTrackFavoriteAsync,
+  updatePlaylistAsync,
   updatePlaylistDescription as updatePlaylistDescriptionAction,
   updatePlaylistImage as updatePlaylistImageAction,
 } from "./librarySlice";
@@ -238,6 +241,26 @@ export const useApiPlaylists = () => {
     return dispatch(toggleTrackFavoriteAsync(track));
   };
 
+  const updatePlaylist = (
+    playlistId: string,
+    updateData: {
+      name?: string;
+      description?: string;
+      coverImageUrl?: string;
+      thumbnailUri?: string;
+    }
+  ) => {
+    return dispatch(updatePlaylistAsync({ playlistId, updateData }));
+  };
+
+  const deletePlaylist = (playlistId: string) => {
+    return dispatch(deletePlaylistAsync(playlistId));
+  };
+
+  const removeSongFromPlaylist = (playlistId: string, songId: string) => {
+    return dispatch(removeSongFromPlaylistAsync({ playlistId, songId }));
+  };
+
   return {
     apiPlaylists,
     loading,
@@ -246,6 +269,9 @@ export const useApiPlaylists = () => {
     createPlaylist,
     addSongToPlaylist,
     toggleFavorite,
+    updatePlaylist,
+    deletePlaylist,
+    removeSongFromPlaylist,
   };
 };
 

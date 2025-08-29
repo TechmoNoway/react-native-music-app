@@ -1,14 +1,16 @@
 import { unknownArtistImageUri } from "@/constants/images";
 import { colors } from "@/constants/tokens";
 import { artistNameFilter } from "@/helpers/filter";
-import { useArtists } from "@/store/hooks";
+import { useArtistsApi } from "@/hooks/useArtistsApi";
 import { defaultStyles, utilsStyles } from "@/styles";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { Link } from "expo-router";
 import { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
+  RefreshControl,
   Text,
   TextInput,
   TouchableHighlight,
@@ -24,7 +26,7 @@ const ItemSeparatorComponent = () => {
 
 const ArtistsScreen = () => {
   const [search, setSearch] = useState("");
-  const artists = useArtists();
+  const { artists, loading, error, refetch } = useArtistsApi();
   const { top, bottom } = useSafeAreaInsets();
 
   const filteredArtists = useMemo(() => {
@@ -33,10 +35,42 @@ const ArtistsScreen = () => {
     return artists.filter(artistNameFilter(search));
   }, [artists, search]);
 
+  if (loading) {
+    return (
+      <View className={defaultStyles.container}>
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text className="text-white text-base mt-4">Loading artists...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View className={defaultStyles.container}>
+        <View className="flex-1 justify-center items-center px-6">
+          <Ionicons name="alert-circle" size={64} color={colors.primary} />
+          <Text className="text-white text-lg font-bold mt-4 text-center">
+            Error Loading Artists
+          </Text>
+          <Text className="text-neutral-400 text-base mt-2 text-center">{error}</Text>
+          <TouchableOpacity
+            onPress={refetch}
+            className="mt-6 px-6 py-3 rounded-lg"
+            style={{ backgroundColor: colors.primary }}
+          >
+            <Text className="text-white text-base font-semibold">Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View className={defaultStyles.container}>
       <ScrollView
-        className="px-6"
+        className="px-4"
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
         style={{
@@ -45,6 +79,13 @@ const ArtistsScreen = () => {
         contentContainerStyle={{
           paddingBottom: Math.max(bottom + 250, 300),
         }}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={refetch}
+            tintColor={colors.primary}
+          />
+        }
       >
         {/* Header Section */}
         <View className="pb-5">
@@ -86,32 +127,18 @@ const ArtistsScreen = () => {
           ListEmptyComponent={
             <View className="items-center py-10">
               <Text className="text-neutral-400 text-base mb-10">No artist found</Text>
-
-              <Image
-                source={{
-                  uri: unknownArtistImageUri,
-                }}
-                style={{
-                  width: 200,
-                  height: 200,
-                  alignSelf: "center",
-                  marginTop: 40,
-                  opacity: 0.3,
-                }}
-                contentFit="cover"
-              />
             </View>
           }
           data={filteredArtists}
           renderItem={({ item: artist }) => {
             return (
-              <Link href={`/artists/${artist.name}`} asChild>
+              <Link href={`/artists/${artist._id}`} asChild>
                 <TouchableHighlight activeOpacity={0.8}>
                   <View className="flex-row gap-3.5 items-center">
                     <View>
                       <Image
                         source={{
-                          uri: unknownArtistImageUri,
+                          uri: artist.imageUrl || unknownArtistImageUri,
                         }}
                         style={{
                           width: 40,

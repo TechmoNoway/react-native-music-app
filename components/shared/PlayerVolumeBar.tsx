@@ -13,7 +13,6 @@ export const PlayerVolumeBar = ({ style }: ViewProps) => {
   const min = useSharedValue(0);
   const max = useSharedValue(1);
 
-  // Use useEffect to avoid accessing .value during render
   useEffect(() => {
     progress.value = volume ?? 0;
   }, [volume, progress]);
