@@ -57,7 +57,6 @@ class AudioService {
 
   async add(tracks: Track | Track[]): Promise<void> {
     if (this.isAdding) {
-      console.log("Already adding tracks, ignoring...");
       return;
     }
 
@@ -65,11 +64,9 @@ class AudioService {
 
     try {
       const tracksArray = Array.isArray(tracks) ? tracks : [tracks];
-      console.log("Adding tracks:", tracksArray.length);
 
       this.queue = [...this.queue, ...tracksArray];
 
-      // If this is the first track and no current track, load it
       if (this.queue.length === tracksArray.length && !this.currentTrack) {
         const firstTrack = this.queue[0];
         if (firstTrack) {
@@ -92,12 +89,10 @@ class AudioService {
 
   async reset(): Promise<void> {
     if (this.isResetting) {
-      console.log("Already resetting, waiting...");
       return;
     }
 
     this.isResetting = true;
-    console.log("Resetting AudioService");
 
     try {
       // Stop and cleanup current sound
@@ -119,8 +114,6 @@ class AudioService {
       this.position = 0;
       this.duration = 0;
       this.emit("PlaybackState", { state: "paused" });
-
-      console.log("AudioService reset completed");
     } catch (error) {
       console.error("Error during reset:", error);
     } finally {
@@ -198,7 +191,6 @@ class AudioService {
 
   async play(): Promise<void> {
     if (this.isResetting) {
-      console.log("Cannot play - currently resetting");
       return;
     }
 
@@ -212,11 +204,9 @@ class AudioService {
       }
 
       if (!this.sound) {
-        console.log("No sound available to play");
         return;
       }
 
-      console.log("Playing track");
       await this.sound.playAsync();
       this.isPlaying = true;
       this.emit("PlaybackState", { state: "playing" });

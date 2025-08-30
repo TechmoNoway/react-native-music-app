@@ -6,7 +6,7 @@ import axios, { isAxiosError } from "axios";
 export class UserService {
   private static profileCache: any = null;
   private static cacheTimestamp: number = 0;
-  private static readonly CACHE_DURATION = 200 * 60 * 1000; // 200 minutes
+  private static readonly CACHE_DURATION = 200 * 60 * 1000;
 
   private static async getAuthHeaders() {
     try {
@@ -29,7 +29,6 @@ export class UserService {
       if (!forceRefresh && this.profileCache && this.cacheTimestamp) {
         const now = Date.now();
         if (now - this.cacheTimestamp < this.CACHE_DURATION) {
-          console.log("Returning cached profile data");
           return this.profileCache;
         }
       }
@@ -77,14 +76,12 @@ export class UserService {
       const isLocalFile = userData.avatar && userData.avatar.startsWith("file://");
 
       if (isLocalFile) {
-        // Use fetch for multipart upload (similar to playlist service)
         try {
           const authToken = await storage.getItem(StorageKeys.AUTH_TOKEN);
           if (!authToken) {
             throw new Error("No auth token found");
           }
 
-          // Create FormData for multipart upload
           const formData = new FormData();
 
           if (userData.username) {
@@ -106,9 +103,6 @@ export class UserService {
             formData.append("avatar", fileInfo as any);
           }
 
-          console.log("Sending FormData with avatar file using fetch");
-
-          // Use fetch for multipart upload
           const response = await fetch(
             `${API_CONFIG.BASE_URL}${API_ENDPOINTS.USER.UPDATE_PROFILE}`,
             {
@@ -124,11 +118,9 @@ export class UserService {
           const data = await response.json();
 
           if (data.success && data.data) {
-            // Clear cache and update with new data
             this.clearCache();
             this.profileCache = data.data.user;
             this.cacheTimestamp = Date.now();
-            console.log("Profile cache updated after avatar upload");
             return data.data.user;
           } else {
             throw new Error(data.message || "Failed to update profile");
@@ -138,9 +130,6 @@ export class UserService {
           throw uploadError;
         }
       } else {
-        // Use axios for JSON requests (no file upload)
-        console.log("Sending JSON data:", userData);
-
         const response = await axios.put<UserProfileResponse>(
           `${API_CONFIG.BASE_URL}${API_ENDPOINTS.USER.UPDATE_PROFILE}`,
           userData,
@@ -151,11 +140,9 @@ export class UserService {
         );
 
         if (response.data.success && response.data.data) {
-          // Clear cache and update with new data
           this.clearCache();
           this.profileCache = response.data.data.user;
           this.cacheTimestamp = Date.now();
-          console.log("Profile cache updated after text update");
           return response.data.data.user;
         } else {
           throw new Error(response.data.message || "Failed to update profile");

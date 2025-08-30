@@ -18,7 +18,6 @@ export const useArtistsApi = () => {
       setLoading(true);
       setError(null);
 
-      console.log("Fetching artists from API...");
       const response = await fetch(
         "https://nodejs-music-app-backend.vercel.app/api/artists"
       );

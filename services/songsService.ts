@@ -168,7 +168,6 @@ class SongsService {
       await this.apiClient.post(`/songs/${id}/play`);
     } catch (error) {
       console.log("Error updating play count:", error);
-      // Don't throw error for play count update
     }
   }
 }

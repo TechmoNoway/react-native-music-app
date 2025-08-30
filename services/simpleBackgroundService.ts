@@ -14,7 +14,6 @@ class SimpleBackgroundService {
 
   private handleAppStateChange = (nextAppState: string) => {
     if (this.appState.match(/inactive|background/) && nextAppState === "active") {
-      console.log("App has come to the foreground");
       if (this.currentTrack && this.isPlaying) {
         console.log(`🎵 Welcome back! Currently playing: ${this.currentTrack.title}`);
       }
@@ -40,7 +39,9 @@ class SimpleBackgroundService {
       if (progress) {
         const progressPercent = Math.round((progress.position / progress.duration) * 100);
         console.log(
-          `📊 Progress: ${progressPercent}% (${Math.floor(progress.position)}s / ${Math.floor(progress.duration)}s)`
+          `📊 Progress: ${progressPercent}% (${Math.floor(
+            progress.position
+          )}s / ${Math.floor(progress.duration)}s)`
         );
       }
     }

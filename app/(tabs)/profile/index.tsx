@@ -44,8 +44,6 @@ export default function ProfileScreen() {
   const { user, logout } = useUser();
   const { profileData, isLoading: isLoadingProfile, fetchProfile } = useUserProfile();
 
-  console.log("ProfileScreen render - user:", user);
-  console.log("ProfileScreen render - profileData:", profileData);
   const hasLoadedProfile = useRef(false);
   const currentUserId = useRef<string | number | null>(null);
   const lastRefreshTime = useRef<number>(0);
@@ -67,22 +65,18 @@ export default function ProfileScreen() {
       if (!user || !user.id) return;
 
       if (isRefreshing.current) {
-        console.log("Profile refresh already in progress, skipping");
         return;
       }
 
       const now = Date.now();
       if (!force && now - lastRefreshTime.current < 2000) {
-        console.log("Profile refresh throttled (too recent)");
         return;
       }
 
       try {
         isRefreshing.current = true;
         lastRefreshTime.current = now;
-        console.log("Refreshing profile data...");
         const result = await fetchProfile(force);
-        console.log("Profile fetched successfully:", result);
       } catch (error) {
         console.error("Error refreshing profile:", error);
         if (error instanceof Error && error.message === "Authentication expired") {
@@ -99,13 +93,9 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      console.log("Profile screen focused");
-
       if (hasFocusedBefore.current) {
-        console.log("Refreshing profile on return focus");
         refreshProfile(false);
       } else {
-        console.log("Initial focus, skipping refresh");
         hasFocusedBefore.current = true;
       }
     }, [refreshProfile])
@@ -113,9 +103,7 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     const loadProfile = async () => {
-      console.log("useEffect loadProfile - user:", user);
       if (!user || !user.id) {
-        console.log("No user or user.id, skipping profile load");
         return;
       }
 
@@ -125,12 +113,10 @@ export default function ProfileScreen() {
       }
 
       if (hasLoadedProfile.current) {
-        console.log("Profile already loaded, skipping");
         return;
       }
 
       hasLoadedProfile.current = true;
-      console.log("Initial profile load");
       await refreshProfile(false);
     };
 
@@ -196,8 +182,6 @@ export default function ProfileScreen() {
             <ActivityIndicator size="large" color={colors.primary} />
           ) : (
             <>
-              {console.log("ProfileData:", profileData)}
-              {console.log("Avatar URL:", profileData?.avatar)}
               <View
                 style={{
                   width: 150,

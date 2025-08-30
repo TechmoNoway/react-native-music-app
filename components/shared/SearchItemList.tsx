@@ -34,12 +34,10 @@ export const TracksList = ({
       const now = Date.now();
 
       if (now - lastTapTime.current < 800) {
-        console.log("Track selection ignored - too rapid (debounce)");
         return;
       }
 
       if (isProcessing || processingRef.current) {
-        console.log("Track selection ignored - already processing");
         return;
       }
 
@@ -48,22 +46,17 @@ export const TracksList = ({
       processingRef.current = true;
 
       try {
-        console.log("Processing track selection:", selectedTrack.title);
-
         const trackIndex = tracks.findIndex(
           (track) => track.fileUrl === selectedTrack.fileUrl
         );
 
         if (trackIndex === -1) {
-          console.log("Track not found in list");
           return;
         }
 
         const isChangingQueue = id !== activeQueueId;
 
         if (isChangingQueue) {
-          console.log("Changing queue, resetting audio service");
-
           const beforeTracks = tracks.slice(0, trackIndex);
           const afterTracks = tracks.slice(trackIndex + 1);
 
@@ -80,8 +73,6 @@ export const TracksList = ({
           queueOffset.current = trackIndex;
           setActiveQueueId(id);
         } else {
-          console.log("Same queue, skipping to track");
-
           const nextTrackIndex =
             trackIndex - queueOffset.current < 0
               ? tracks.length + trackIndex - queueOffset.current

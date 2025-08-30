@@ -89,7 +89,6 @@ export const useArtistDetail = (artistId: string) => {
         const mappedTracks = artistTracks.map(mapApiTrackToTrack);
         setTracks(mappedTracks);
       } else {
-        console.log("Songs endpoint failed, showing artist with empty tracks");
         setTracks([]);
       }
     } catch (err) {

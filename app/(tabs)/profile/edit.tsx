@@ -30,28 +30,15 @@ export default function EditProfileScreen() {
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
-    console.log("Fetching profile data...");
     fetchProfile();
   }, [fetchProfile]);
 
   useEffect(() => {
-    console.log("User data:", user);
-    console.log("Profile data:", profileData);
-
     if (profileData) {
-      console.log("Using profile data:", {
-        username: profileData.username,
-        email: profileData.email,
-        avatar: profileData.avatar,
-      });
       setUsername(profileData.username || user?.username || "");
       setEmail(profileData.email || user?.email || "");
       setAvatar(profileData.avatar || null);
     } else if (user) {
-      console.log("Using user data as fallback:", {
-        username: user.username,
-        email: user.email,
-      });
       setUsername(user.username || "");
       setEmail(user.email || "");
     }
@@ -103,8 +90,6 @@ export default function EditProfileScreen() {
         email: email.trim(),
         avatar: avatar || undefined,
       });
-
-      console.log("Profile updated successfully");
 
       Alert.alert("Success", "Profile updated successfully", [
         {
