@@ -25,6 +25,13 @@ export const API_ENDPOINTS = {
     PROFILE: "/users/profile",
     UPDATE_PROFILE: "/users/profile",
   },
+  SONGS: {
+    LIST: "/songs",
+    GET: (id: string) => `/songs/${id}`,
+    POPULAR: "/songs/popular/top",
+    LIKE: (id: string) => `/songs/${id}/like`,
+    UNLIKE: (id: string) => `/songs/${id}/unlike`,
+  },
   PLAYLIST: {
     LIST: "/playlists",
     CREATE: "/playlists",

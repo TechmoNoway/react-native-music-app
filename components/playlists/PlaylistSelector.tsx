@@ -63,6 +63,14 @@ export const PlaylistSelector = ({
     const isCurrentlyAdding = isAddingToPlaylist && addingPlaylistName === item.name;
     const isTrackInPlaylist = item.songs.some((song) => song._id === track._id);
 
+    const handlePlaylistPress = () => {
+      if (isTrackInPlaylist) {
+        Alert.alert("Info", "This song is already in the playlist.", [{ text: "OK" }]);
+        return;
+      }
+      onPlaylistSelect(item);
+    };
+
     return (
       <TouchableOpacity
         style={{
@@ -71,10 +79,11 @@ export const PlaylistSelector = ({
           padding: 16,
           borderBottomWidth: 1,
           borderBottomColor: colors.border,
-          opacity: isAddingToPlaylist && !isCurrentlyAdding ? 0.5 : 1,
+          opacity:
+            (isAddingToPlaylist && !isCurrentlyAdding) || isTrackInPlaylist ? 0.6 : 1,
         }}
-        onPress={() => onPlaylistSelect(item)}
-        disabled={isAddingToPlaylist || isTrackInPlaylist}
+        onPress={handlePlaylistPress}
+        disabled={isAddingToPlaylist}
       >
         <Image
           source={{
@@ -99,13 +108,14 @@ export const PlaylistSelector = ({
           )}
           <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
             {item.songs.length} songs
+            {isTrackInPlaylist && " • Already added"}
           </Text>
         </View>
 
         {isCurrentlyAdding ? (
           <ActivityIndicator size="small" color={colors.primary} />
         ) : isTrackInPlaylist ? (
-          <Ionicons name="heart" size={24} color="white" />
+          <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
         ) : (
           <Ionicons name="add" size={24} color={colors.primary} />
         )}
@@ -165,18 +175,36 @@ export const PlaylistSelector = ({
 
   return (
     <View style={{ flex: 1 }}>
-      <Text
+      {/* Header with back button */}
+      <View
         style={{
-          color: colors.text,
-          fontSize: 18,
-          fontWeight: "600",
-          padding: 16,
+          flexDirection: "row",
+          alignItems: "center",
+          paddingVertical: 12,
           borderBottomWidth: 1,
           borderBottomColor: colors.border,
         }}
       >
-        Add &quot;{track.title}&quot; to playlist
-      </Text>
+        <TouchableOpacity
+          onPress={onClose}
+          style={{
+            padding: 8,
+            marginRight: 12,
+          }}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.icon} />
+        </TouchableOpacity>
+        <Text
+          style={{
+            color: colors.text,
+            fontSize: 18,
+            fontWeight: "600",
+            flex: 1,
+          }}
+        >
+          Add &quot;{track.title}&quot; to playlist
+        </Text>
+      </View>
 
       <FlatList
         data={playlists}

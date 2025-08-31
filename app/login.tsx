@@ -426,7 +426,7 @@ export default function LoginScreen() {
           </View>
 
           {/* Google and Facebook Icons */}
-          <View className="flex-row items-center justify-center space-x-6">
+          <View className="flex flex-row items-center justify-center gap-5">
             <TouchableOpacity
               className={`w-12 h-12 bg-white rounded-full items-center justify-center shadow-md border border-gray-200 ${
                 isLoading ? "opacity-50" : ""
@@ -438,7 +438,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              className={`w-12 h-12 bg-blue-600 rounded-full items-center justify-center shadow-md ${
+              className={`w-12 h-12 bg-white rounded-full items-center justify-center shadow-md border border-gray-200 ${
                 isLoading ? "opacity-50" : ""
               }`}
               onPress={handleFacebookLogin}
@@ -455,7 +455,9 @@ export default function LoginScreen() {
             <Text className="text-black text-sm">Don&apos;t have an account? </Text>
             <TouchableOpacity onPress={handleNavigateToSignUp} disabled={isLoading}>
               <Text
-                className={`font-medium text-sm ${isLoading ? "text-gray-400" : "text-blue-500"}`}
+                className={`font-medium text-sm ${
+                  isLoading ? "text-gray-400" : "text-blue-500"
+                }`}
               >
                 Sign up
               </Text>

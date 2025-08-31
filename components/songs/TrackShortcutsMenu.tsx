@@ -1,3 +1,4 @@
+import { PlaylistSelectorModal } from "@/components/shared/PlaylistSelectorModal";
 import { colors } from "@/constants/tokens";
 import {
   getLikeActionText,
@@ -12,7 +13,6 @@ import { playlistService } from "@/services/playlistService";
 import { useApiPlaylists, useFavorites, useQueue } from "@/store/hooks";
 import { Track } from "@/types/audio";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import { PropsWithChildren, useState } from "react";
 import {
   ActivityIndicator,
@@ -26,12 +26,10 @@ import {
 
 type TrackShortcutsMenuProps = PropsWithChildren<{
   track: Track;
-  // Add context prop to determine if we're in a playlist
   context?: {
     type: "playlist";
     playlistId: string;
   };
-  // Callback for when song is removed from playlist
   onSongRemoved?: () => void;
 }>;
 
@@ -41,9 +39,10 @@ export const TrackShortcutsMenu = ({
   context,
   onSongRemoved,
 }: TrackShortcutsMenuProps) => {
-  const router = useRouter();
   const [modalVisible, setModalVisible] = useState(false);
+  const [playlistSelectorVisible, setPlaylistSelectorVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPlaylistLoading, setIsPlaylistLoading] = useState(false);
   const { user } = useUser();
   const { removeSongFromPlaylist } = useApiPlaylists();
 
@@ -64,6 +63,27 @@ export const TrackShortcutsMenu = ({
 
   const { toggleTrackFavorite } = useFavorites();
   const { activeQueueId } = useQueue();
+
+  const handleAddToPlaylist = async (playlistId: string) => {
+    try {
+      setIsPlaylistLoading(true);
+
+      await playlistService.addSongToPlaylist(playlistId, {
+        songId: track._id,
+      });
+
+      // Close the playlist selector modal
+      setPlaylistSelectorVisible(false);
+      Alert.alert("Success", "Song added to playlist successfully!", [{ text: "OK" }]);
+    } catch (error) {
+      console.error("Error adding to playlist:", error);
+      Alert.alert("Error", "Failed to add song to playlist. Please try again.", [
+        { text: "OK" },
+      ]);
+    } finally {
+      setIsPlaylistLoading(false);
+    }
+  };
 
   const handlePressAction = async (id: string) => {
     setModalVisible(false);
@@ -139,7 +159,6 @@ export const TrackShortcutsMenu = ({
 
             Alert.alert("Success", getLikeSuccessMessage(false), [{ text: "OK" }]);
 
-            // If we're in a playlist context (especially Liked Songs), reload the playlist
             onSongRemoved?.();
           } catch (error) {
             console.error("Error removing from favorites:", error);
@@ -154,11 +173,10 @@ export const TrackShortcutsMenu = ({
           break;
 
         case "add-to-playlist":
-          router.push({
-            pathname: "/(modals)/addToPlaylist",
-            params: { trackUrl: track.fileUrl },
-          });
-          break;
+          setModalVisible(false);
+          setPlaylistSelectorVisible(true);
+          setIsLoading(false);
+          return;
 
         case "remove-from-playlist":
           if (context?.type === "playlist" && context.playlistId) {
@@ -190,7 +208,7 @@ export const TrackShortcutsMenu = ({
         {children}
       </TouchableOpacity>
 
-      {/* Loading overlay for favorites action */}
+      {/* Loading overlay for favorites action only */}
       {isLoading && (
         <Modal animationType="fade" transparent={true} visible={isLoading}>
           <View
@@ -280,6 +298,15 @@ export const TrackShortcutsMenu = ({
           </View>
         </Pressable>
       </Modal>
+
+      <PlaylistSelectorModal
+        visible={playlistSelectorVisible}
+        onClose={() => setPlaylistSelectorVisible(false)}
+        trackTitle={track.title}
+        trackId={track._id}
+        onAddToPlaylist={handleAddToPlaylist}
+        isLoading={isPlaylistLoading}
+      />
     </>
   );
 };

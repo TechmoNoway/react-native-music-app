@@ -6,12 +6,14 @@ import { colors } from "@/constants/tokens";
 import { usePlayerBackground } from "@/hooks/usePlayerBackground";
 import { useTrackPlayerFavorite } from "@/hooks/useTrackPlayerFavorite";
 import { useActiveTrack } from "@/services/audioService";
+import { FavoriteService } from "@/services/favoriteService";
 import { defaultStyles } from "@/styles";
 import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { Stack, useRouter } from "expo-router";
-import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import { ActivityIndicator, Alert, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const PlayerScreen = () => {
@@ -22,13 +24,62 @@ const PlayerScreen = () => {
   );
 
   const { top, bottom } = useSafeAreaInsets();
-
   const { isFavorite, toggleFavorite } = useTrackPlayerFavorite();
+
+  // State cho modal
+  const [showTrackOptions, setShowTrackOptions] = useState(false);
+  const [isLikeLoading, setIsLikeLoading] = useState(false);
 
   const handleMinimize = () => {
     router.back();
   };
 
+  const handleShowOptions = () => {
+    setShowTrackOptions(true);
+  };
+
+  const handleAddToLiked = async () => {
+    if (!activeTrack?._id) return;
+
+    setIsLikeLoading(true);
+    setShowTrackOptions(false);
+
+    try {
+      if (isFavorite) {
+        await FavoriteService.unlikeSong(activeTrack._id);
+        Alert.alert("Success", "Song removed from liked songs");
+      } else {
+        await FavoriteService.likeSong(activeTrack._id);
+        Alert.alert("Success", "Song added to liked songs");
+      }
+
+      // Cập nhật trạng thái favorite trong hook
+      toggleFavorite();
+    } catch (error: any) {
+      console.error("Error handling like/unlike:", error);
+      Alert.alert("Error", error.message || "Failed to update liked songs");
+    } finally {
+      setIsLikeLoading(false);
+    }
+  };
+
+  const handleAddToPlaylist = () => {
+    console.log("Player: Opening playlist selector");
+    console.log("Player: activeTrack =", activeTrack);
+    console.log("Player: activeTrack.fileUrl =", activeTrack?.fileUrl);
+    setShowTrackOptions(false);
+    // Use router navigation instead of modal for player screen
+    if (!activeTrack?.fileUrl) return;
+
+    router.push({
+      pathname: "/(modals)/addToPlaylist",
+      params: {
+        trackUrl: activeTrack.fileUrl,
+        trackId: activeTrack._id,
+        trackTitle: activeTrack.title,
+      },
+    });
+  };
   if (!activeTrack) {
     return (
       <>
@@ -141,7 +192,12 @@ const PlayerScreen = () => {
                 </View>
 
                 {/* Nút menu */}
-                <TouchableOpacity className="p-2">
+                <TouchableOpacity
+                  className="p-2"
+                  onPress={() => {
+                    handleShowOptions();
+                  }}
+                >
                   <Ionicons name="ellipsis-horizontal" size={24} color="white" />
                 </TouchableOpacity>
               </View>
@@ -237,6 +293,156 @@ const PlayerScreen = () => {
           </View>
         </View>
       </LinearGradient>
+
+      {/* Spotify-style Bottom Sheet Modal */}
+      {showTrackOptions && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            zIndex: 999999,
+            justifyContent: "flex-end",
+          }}
+        >
+          {/* Backdrop */}
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            activeOpacity={1}
+            onPress={() => setShowTrackOptions(false)}
+          />
+
+          {/* Bottom Sheet */}
+          <View
+            style={{
+              backgroundColor: "#1a1a1a",
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              paddingBottom: 40,
+            }}
+          >
+            {/* Header with drag indicator */}
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <View
+                style={{
+                  width: 40,
+                  height: 4,
+                  backgroundColor: "#666",
+                  borderRadius: 2,
+                  marginBottom: 16,
+                }}
+              />
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: "white",
+                  fontSize: 16,
+                  fontWeight: "600",
+                  textAlign: "center",
+                }}
+              >
+                {activeTrack.title || "Unknown Track"}
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: "#999",
+                  fontSize: 14,
+                  textAlign: "center",
+                  marginTop: 4,
+                }}
+              >
+                {typeof activeTrack.artist === "string"
+                  ? activeTrack.artist
+                  : activeTrack.artist?.name || "Unknown Artist"}
+              </Text>
+            </View>
+
+            {/* Divider */}
+            <View style={{ height: 1, backgroundColor: "#333", marginBottom: 8 }} />
+
+            {/* Menu Options */}
+            <View>
+              {/* Add to Liked Songs */}
+              <TouchableOpacity
+                onPress={handleAddToLiked}
+                disabled={isLikeLoading}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 16,
+                  paddingHorizontal: 20,
+                  opacity: isLikeLoading ? 0.6 : 1,
+                }}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: isFavorite ? "#1DB954" : colors.primary,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginRight: 16,
+                  }}
+                >
+                  {isLikeLoading ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Ionicons
+                      name={isFavorite ? "heart" : "heart-outline"}
+                      size={18}
+                      color="white"
+                    />
+                  )}
+                </View>
+                <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
+                  {isLikeLoading
+                    ? "Processing..."
+                    : isFavorite
+                    ? "Remove from Liked Songs"
+                    : "Add to Liked Songs"}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Add to Playlist */}
+              <TouchableOpacity
+                onPress={() => {
+                  handleAddToPlaylist();
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 16,
+                  paddingHorizontal: 20,
+                }}
+                activeOpacity={0.7}
+              >
+                <View
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: "#333",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginRight: 16,
+                  }}
+                >
+                  <Ionicons name="add" size={20} color="white" />
+                </View>
+                <Text style={{ color: "white", fontSize: 16, fontWeight: "500" }}>
+                  Add to playlist
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </>
   );
 };

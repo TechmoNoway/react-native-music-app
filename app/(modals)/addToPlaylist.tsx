@@ -17,14 +17,59 @@ const AddToPlaylistModal = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [addingPlaylistName, setAddingPlaylistName] = useState<string>("");
 
-  const { trackUrl } = useLocalSearchParams<{ trackUrl: Track["fileUrl"] }>();
+  const { trackUrl, trackId, trackTitle } = useLocalSearchParams<{
+    trackUrl: Track["fileUrl"];
+    trackId?: string;
+    trackTitle?: string;
+  }>();
 
   const tracks = useTracks();
 
-  const track = tracks.find((currentTrack) => trackUrl === currentTrack.fileUrl);
+  console.log("AddToPlaylistModal: trackUrl =", trackUrl);
+  console.log("AddToPlaylistModal: trackId =", trackId);
+  console.log("AddToPlaylistModal: trackTitle =", trackTitle);
+  console.log("AddToPlaylistModal: tracks count =", tracks.length);
+
+  let track = tracks.find(
+    (currentTrack) => trackUrl === currentTrack.fileUrl || trackId === currentTrack._id
+  );
+
+  // If not found in tracks store, create a minimal track object from params
+  if (!track && trackId && trackTitle) {
+    track = {
+      _id: trackId,
+      title: trackTitle,
+      fileUrl: trackUrl,
+    } as Track;
+    console.log("AddToPlaylistModal: Using track from params");
+  }
+
+  console.log("AddToPlaylistModal: found track =", track ? track.title : "NOT FOUND");
+
+  if (tracks.length > 0) {
+    console.log("First track example:", {
+      _id: tracks[0]._id,
+      fileUrl: tracks[0].fileUrl,
+      title: tracks[0].title,
+    });
+  }
 
   if (!track) {
-    return null;
+    return (
+      <SafeAreaView
+        className={`${defaultStyles.container} px-6`}
+        style={{ paddingTop: headerHeight }}
+      >
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <Text style={{ color: colors.text, fontSize: 16 }}>
+            Track not found. TrackUrl: {trackUrl}
+          </Text>
+          <Text style={{ color: colors.text, fontSize: 14, marginTop: 10 }}>
+            Available tracks: {tracks.length}
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
   }
 
   const handlePlaylistPress = async (playlist: PlaylistApiResponse) => {
