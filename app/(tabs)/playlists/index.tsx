@@ -1,4 +1,5 @@
 import { PlaylistsList } from "@/components/playlists/PlaylistsList";
+import { CreatePlaylistModal } from "@/components/shared/CreatePlaylistModal";
 import { colors } from "@/constants/tokens";
 import { playlistNameFilter } from "@/helpers/filter";
 import { Playlist, convertApiPlaylistToPlaylist } from "@/helpers/types";
@@ -12,9 +13,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   RefreshControl,
   ScrollView,
   Text,
@@ -33,6 +31,7 @@ const PlaylistsScreen = () => {
   const [apiPlaylists, setApiPlaylists] = useState<PlaylistApiResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { playlists } = usePlaylists();
@@ -94,19 +93,19 @@ const PlaylistsScreen = () => {
     setShowCreateDialog(true);
   };
 
-  const handleCreatePlaylist = async () => {
-    if (!newPlaylistName.trim()) {
+  const handleCreatePlaylist = async (name: string) => {
+    if (!name.trim()) {
       Alert.alert("Error", "Please enter a playlist name");
       return;
     }
 
-    if (newPlaylistName.trim().toLowerCase() === "liked songs") {
+    if (name.trim().toLowerCase() === "liked songs") {
       Alert.alert("Error", "This playlist name is reserved");
       return;
     }
 
     const existingPlaylist = combinedPlaylists.find(
-      (playlist) => playlist.name.toLowerCase() === newPlaylistName.trim().toLowerCase()
+      (playlist) => playlist.name.toLowerCase() === name.trim().toLowerCase()
     );
 
     if (existingPlaylist) {
@@ -115,8 +114,9 @@ const PlaylistsScreen = () => {
     }
 
     try {
+      setIsCreating(true);
       await createApiPlaylist({
-        name: newPlaylistName.trim(),
+        name: name.trim(),
         description: "",
         coverImageUrl: "",
       });
@@ -127,10 +127,12 @@ const PlaylistsScreen = () => {
       onRefresh();
 
       setTimeout(() => {
-        router.push(`/(tabs)/playlists/${newPlaylistName.trim()}`);
+        router.push(`/(tabs)/playlists/${name.trim()}`);
       }, 100);
     } catch {
       Alert.alert("Error", "Failed to create playlist. Please try again.");
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -263,84 +265,14 @@ const PlaylistsScreen = () => {
       </ScrollView>
 
       {/* Create Playlist Dialog */}
-      <Modal
-        animationType="fade"
-        transparent={true}
+      <CreatePlaylistModal
         visible={showCreateDialog}
-        onRequestClose={handleCancelCreate}
-      >
-        <KeyboardAvoidingView
-          className="flex-1"
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <View className="flex-1 bg-black/50 justify-center p-5">
-            <View className="bg-neutral-900 rounded-2xl p-6 shadow-lg">
-              {/* Header */}
-              <View className="flex-row items-center mb-6">
-                <Ionicons
-                  name="musical-notes"
-                  size={24}
-                  color={colors.primary}
-                  className="mr-3"
-                />
-                <Text className="text-white text-xl font-bold flex-1">
-                  Create New Playlist
-                </Text>
-                <TouchableOpacity onPress={handleCancelCreate}>
-                  <Ionicons name="close" size={24} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Input Field */}
-              <View className="mb-6">
-                <Text className="text-white text-base font-semibold mb-2">
-                  Playlist Name
-                </Text>
-                <TextInput
-                  value={newPlaylistName}
-                  onChangeText={setNewPlaylistName}
-                  placeholder="Enter playlist name..."
-                  placeholderTextColor={colors.textMuted}
-                  className={`bg-neutral-800 rounded-xl px-4 py-3 text-white text-base border-2 ${
-                    newPlaylistName ? "border-blue-500" : "border-transparent"
-                  }`}
-                  autoFocus
-                  maxLength={50}
-                />
-                <Text className="text-neutral-400 text-xs mt-1">
-                  {newPlaylistName.length}/50 characters
-                </Text>
-              </View>
-
-              {/* Action Buttons */}
-              <View className="flex-row gap-3">
-                <TouchableOpacity
-                  onPress={handleCancelCreate}
-                  className="flex-1 bg-neutral-800 rounded-xl py-3.5 items-center"
-                >
-                  <Text className="text-neutral-400 text-base font-semibold">Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={handleCreatePlaylist}
-                  disabled={!newPlaylistName.trim()}
-                  className={`flex-1 rounded-xl py-3.5 items-center ${
-                    newPlaylistName.trim() ? "bg-blue-500" : "bg-neutral-800"
-                  }`}
-                >
-                  <Text
-                    className={`text-base font-semibold ${
-                      newPlaylistName.trim() ? "text-white" : "text-neutral-400"
-                    }`}
-                  >
-                    Create
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        onClose={handleCancelCreate}
+        onCreatePlaylist={handleCreatePlaylist}
+        playlistName={newPlaylistName}
+        setPlaylistName={setNewPlaylistName}
+        isLoading={isCreating}
+      />
     </View>
   );
 };

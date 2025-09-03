@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { CreatePlaylistModal } from "./CreatePlaylistModal";
 
 interface Playlist {
   _id: string;
@@ -24,7 +25,7 @@ interface PlaylistSelectorModalProps {
   visible: boolean;
   onClose: () => void;
   trackTitle?: string;
-  trackId?: string; // Add track ID to check duplicates
+  trackId?: string;
   onAddToPlaylist: (playlistId: string) => void;
   isLoading?: boolean;
 }
@@ -40,11 +41,12 @@ export const PlaylistSelectorModal: React.FC<PlaylistSelectorModalProps> = ({
   const { bottom } = useSafeAreaInsets();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState("");
+  const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
 
-  // Load playlists from API
   useEffect(() => {
     if (visible) {
-      console.log("PlaylistSelectorModal: Modal is now visible");
       loadPlaylists();
     }
   }, [visible]);
@@ -52,11 +54,9 @@ export const PlaylistSelectorModal: React.FC<PlaylistSelectorModalProps> = ({
   const loadPlaylists = async () => {
     try {
       setIsLoading(true);
-      console.log("Loading playlists...");
       const { playlists: userPlaylists } = await playlistService.getUserPlaylists({
         type: "custom",
       });
-      console.log("Loaded playlists:", userPlaylists);
       setPlaylists(userPlaylists);
     } catch (error) {
       console.error("Error loading playlists:", error);
@@ -69,34 +69,70 @@ export const PlaylistSelectorModal: React.FC<PlaylistSelectorModalProps> = ({
   };
 
   const handleCreateNewPlaylist = () => {
-    Alert.prompt(
-      "Create New Playlist",
-      "Enter playlist name:",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Create",
-          onPress: (name) => {
-            if (name && name.trim()) {
-              const newPlaylist: Playlist = {
-                _id: Date.now().toString(),
-                name: name.trim(),
-                songs: [],
-                isCreated: true,
-              };
-              setPlaylists((prev) => [newPlaylist, ...prev]);
-              onAddToPlaylist(newPlaylist._id);
-              onClose();
-            }
-          },
-        },
-      ],
-      "plain-text"
+    setShowCreateModal(true);
+  };
+
+  const handleCreatePlaylist = async (name: string) => {
+    if (!name.trim()) {
+      Alert.alert("Error", "Please enter a playlist name");
+      return;
+    }
+
+    if (name.trim().toLowerCase() === "liked songs") {
+      Alert.alert("Error", "This playlist name is reserved");
+      return;
+    }
+
+    const existingPlaylist = playlists.find(
+      (playlist) => playlist.name.toLowerCase() === name.trim().toLowerCase()
     );
+
+    if (existingPlaylist) {
+      Alert.alert("Error", "A playlist with this name already exists");
+      return;
+    }
+
+    try {
+      setIsCreatingPlaylist(true);
+
+      // Create playlist via API
+      const { playlist } = await playlistService.createPlaylist({
+        name: name.trim(),
+        description: "",
+        coverImageUrl: "",
+      });
+
+      const newPlaylist: Playlist = {
+        _id: playlist._id,
+        name: playlist.name,
+        songs: [],
+        isCreated: true,
+      };
+
+      setPlaylists((prev) => [newPlaylist, ...prev]);
+      setShowCreateModal(false);
+      setNewPlaylistName("");
+
+      // Add track to the new playlist if trackId exists
+      if (trackId) {
+        onAddToPlaylist(newPlaylist._id);
+      }
+
+      onClose();
+    } catch (error) {
+      console.error("Error creating playlist:", error);
+      Alert.alert("Error", "Failed to create playlist. Please try again.");
+    } finally {
+      setIsCreatingPlaylist(false);
+    }
+  };
+
+  const handleCloseCreateModal = () => {
+    setShowCreateModal(false);
+    setNewPlaylistName("");
   };
 
   const handleSelectPlaylist = (playlist: Playlist) => {
-    // Check if track is already in playlist
     if (trackId) {
       const isTrackInPlaylist = playlist.songs.some((song: any) => song._id === trackId);
 
@@ -107,7 +143,6 @@ export const PlaylistSelectorModal: React.FC<PlaylistSelectorModalProps> = ({
     }
 
     onAddToPlaylist(playlist._id);
-    // Don't close here, let the parent component handle it
   };
 
   if (!visible) return null;
@@ -326,6 +361,16 @@ export const PlaylistSelectorModal: React.FC<PlaylistSelectorModalProps> = ({
           )}
         </View>
       </View>
+
+      {/* Create Playlist Modal */}
+      <CreatePlaylistModal
+        visible={showCreateModal}
+        onClose={handleCloseCreateModal}
+        onCreatePlaylist={handleCreatePlaylist}
+        playlistName={newPlaylistName}
+        setPlaylistName={setNewPlaylistName}
+        isLoading={isCreatingPlaylist}
+      />
     </Modal>
   );
 };
