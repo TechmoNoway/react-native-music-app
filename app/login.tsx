@@ -1,5 +1,6 @@
 import { API_CONFIG, API_ENDPOINTS, LOGIN_METHODS } from "@/constants/api";
 import { useUser } from "@/hooks/useUser";
+import { googleSignInService } from "@/services/googleSignInService";
 import type { LoginResponse, SocialLoginResponse } from "@/types/api";
 import { storage, StorageKeys } from "@/utils/storage";
 import { Ionicons } from "@expo/vector-icons";
@@ -191,17 +192,26 @@ export default function LoginScreen() {
     setError("");
 
     try {
-      // You would integrate with Google Sign-In SDK here
-      // For now, making API call with Google token
+      // Sign in with Google using React Native Google Sign In
+      const googleResponse = await googleSignInService.signIn();
 
-      // Example: Get Google token from Google Sign-In SDK
-      // const googleToken = await GoogleSignIn.signIn();
+      console.log("Google Sign In Response:", googleResponse);
 
+      // Send the Google token to your backend for verification
       const response = await axios.post<SocialLoginResponse>(
         `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH.GOOGLE}`,
         {
-          // googleToken: googleToken.idToken,
+          googleToken: googleResponse.idToken,
+          accessToken: googleResponse.accessToken,
           provider: "google",
+          userInfo: {
+            id: googleResponse.user.id,
+            name: googleResponse.user.name,
+            email: googleResponse.user.email,
+            photo: googleResponse.user.photo,
+            givenName: googleResponse.user.givenName,
+            familyName: googleResponse.user.familyName,
+          },
         },
         {
           timeout: API_CONFIG.TIMEOUT,
@@ -214,9 +224,9 @@ export default function LoginScreen() {
 
         const userData = {
           id: user.id,
-          name: user.name,
-          email: user.email,
-          avatar: user.avatar,
+          name: user.name || googleResponse.user.name || "Unknown",
+          email: user.email || googleResponse.user.email || "",
+          avatar: user.avatar || googleResponse.user.photo || undefined,
           loginMethod: LOGIN_METHODS.GOOGLE,
           loginTime: new Date().toISOString(),
         };
@@ -238,6 +248,8 @@ export default function LoginScreen() {
 
       if (isAxiosError(error) && error.response) {
         setError(error.response.data?.message || "Google login failed");
+      } else if (error instanceof Error) {
+        setError(error.message);
       } else {
         setError("Google login failed. Please try again.");
       }

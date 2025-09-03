@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "react-native-music-app-beta",
-    "slug": "react-native-music-app-beta",
+    "name": "react-native-music-app",
+    "slug": "react-native-music-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "reactnativemusicappbeta",
+    "scheme": "reactnativemusicapp",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/images/splash-icon.png",
@@ -17,19 +17,21 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.reactnativemusicappbeta"
+      "bundleIdentifier": "com.anonymous.reactnativemusicapp"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.anonymous.reactnativemusicappbeta",
+      "package": "com.anonymous.reactnativemusicapp",
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.WAKE_LOCK",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ]
     },
     "web": {
@@ -46,10 +48,19 @@
           "photosPermission": "The app accesses your photos to let you share them.",
           "cameraPermission": "The app accesses your camera to let you take photos."
         }
+      ],
+      [
+        "@react-native-google-signin/google-signin"
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6523c71f-6b3f-4c1a-b071-196fd09c23e7"
+      }
     }
   }
 }
