@@ -7,6 +7,7 @@ import {
   getLikeSuccessMessage,
   isTrackLiked,
 } from "@/helpers/trackHelpers";
+import { useDialog } from "@/hooks/useDialog";
 import { useUser } from "@/hooks/useUser";
 import AudioService from "@/services/audioService";
 import { playlistService } from "@/services/playlistService";
@@ -16,7 +17,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { PropsWithChildren, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   Text,
@@ -39,6 +39,7 @@ export const TrackShortcutsMenu = ({
   context,
   onSongRemoved,
 }: TrackShortcutsMenuProps) => {
+  const { showAlert } = useDialog();
   const [modalVisible, setModalVisible] = useState(false);
   const [playlistSelectorVisible, setPlaylistSelectorVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -74,12 +75,10 @@ export const TrackShortcutsMenu = ({
 
       // Close the playlist selector modal
       setPlaylistSelectorVisible(false);
-      Alert.alert("Success", "Song added to playlist successfully!", [{ text: "OK" }]);
+      showAlert("Success", "Song added to playlist successfully!");
     } catch (error) {
       console.error("Error adding to playlist:", error);
-      Alert.alert("Error", "Failed to add song to playlist. Please try again.", [
-        { text: "OK" },
-      ]);
+      showAlert("Error", "Failed to add song to playlist. Please try again.");
     } finally {
       setIsPlaylistLoading(false);
     }
@@ -109,7 +108,7 @@ export const TrackShortcutsMenu = ({
 
             toggleTrackFavorite(track);
 
-            Alert.alert("Success", getLikeSuccessMessage(true), [{ text: "OK" }]);
+            showAlert("Success", getLikeSuccessMessage(true));
 
             if (activeQueueId?.startsWith("favorites")) {
               await AudioService.add(track);
@@ -126,7 +125,7 @@ export const TrackShortcutsMenu = ({
               track.likesCount = Math.max(0, (track.likesCount || 1) - 1);
             }
 
-            Alert.alert("Error", getLikeErrorMessage(true), [{ text: "OK" }]);
+            showAlert("Error", getLikeErrorMessage(true));
           }
           break;
 
@@ -157,7 +156,7 @@ export const TrackShortcutsMenu = ({
               await AudioService.remove(trackToRemove);
             }
 
-            Alert.alert("Success", getLikeSuccessMessage(false), [{ text: "OK" }]);
+            showAlert("Success", getLikeSuccessMessage(false));
 
             onSongRemoved?.();
           } catch (error) {
@@ -168,7 +167,7 @@ export const TrackShortcutsMenu = ({
               track.likesCount = (track.likesCount || 0) + 1;
             }
 
-            Alert.alert("Error", getLikeErrorMessage(false), [{ text: "OK" }]);
+            showAlert("Error", getLikeErrorMessage(false));
           }
           break;
 
@@ -182,13 +181,11 @@ export const TrackShortcutsMenu = ({
           if (context?.type === "playlist" && context.playlistId) {
             try {
               await removeSongFromPlaylist(context.playlistId, track._id);
-              Alert.alert("Success", "Song removed from playlist", [{ text: "OK" }]);
+              showAlert("Success", "Song removed from playlist");
               onSongRemoved?.();
             } catch (error) {
               console.error("Error removing song from playlist:", error);
-              Alert.alert("Error", "Failed to remove song from playlist", [
-                { text: "OK" },
-              ]);
+              showAlert("Error", "Failed to remove song from playlist");
             }
           }
           break;

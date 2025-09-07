@@ -3,6 +3,7 @@ import { CreatePlaylistModal } from "@/components/shared/CreatePlaylistModal";
 import { colors } from "@/constants/tokens";
 import { playlistNameFilter } from "@/helpers/filter";
 import { Playlist, convertApiPlaylistToPlaylist } from "@/helpers/types";
+import { useDialog } from "@/hooks/useDialog";
 import { playlistService } from "@/services/playlistService";
 import { useApiPlaylists, usePlaylists } from "@/store/hooks";
 import { defaultStyles } from "@/styles";
@@ -12,7 +13,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   RefreshControl,
   ScrollView,
   Text,
@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const PlaylistsScreen = () => {
   const router = useRouter();
+  const { showAlert } = useDialog();
   const [search, setSearch] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
@@ -95,12 +96,12 @@ const PlaylistsScreen = () => {
 
   const handleCreatePlaylist = async (name: string) => {
     if (!name.trim()) {
-      Alert.alert("Error", "Please enter a playlist name");
+      showAlert("Error", "Please enter a playlist name");
       return;
     }
 
     if (name.trim().toLowerCase() === "liked songs") {
-      Alert.alert("Error", "This playlist name is reserved");
+      showAlert("Error", "This playlist name is reserved");
       return;
     }
 
@@ -109,7 +110,7 @@ const PlaylistsScreen = () => {
     );
 
     if (existingPlaylist) {
-      Alert.alert("Error", "A playlist with this name already exists");
+      showAlert("Error", "A playlist with this name already exists");
       return;
     }
 
@@ -130,7 +131,7 @@ const PlaylistsScreen = () => {
         router.push(`/(tabs)/playlists/${name.trim()}`);
       }, 100);
     } catch {
-      Alert.alert("Error", "Failed to create playlist. Please try again.");
+      showAlert("Error", "Failed to create playlist. Please try again.");
     } finally {
       setIsCreating(false);
     }

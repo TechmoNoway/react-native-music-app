@@ -1,10 +1,10 @@
 import { colors } from "@/constants/tokens";
+import { useDialog } from "@/hooks/useDialog";
 import { playlistService } from "@/services/playlistService";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   Text,
@@ -39,19 +39,14 @@ export const PlaylistSelectorModal: React.FC<PlaylistSelectorModalProps> = ({
   isLoading: externalLoading = false,
 }) => {
   const { bottom } = useSafeAreaInsets();
+  const { showAlert } = useDialog();
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [isCreatingPlaylist, setIsCreatingPlaylist] = useState(false);
 
-  useEffect(() => {
-    if (visible) {
-      loadPlaylists();
-    }
-  }, [visible]);
-
-  const loadPlaylists = async () => {
+  const loadPlaylists = useCallback(async () => {
     try {
       setIsLoading(true);
       const { playlists: userPlaylists } = await playlistService.getUserPlaylists({
@@ -60,13 +55,17 @@ export const PlaylistSelectorModal: React.FC<PlaylistSelectorModalProps> = ({
       setPlaylists(userPlaylists);
     } catch (error) {
       console.error("Error loading playlists:", error);
-      Alert.alert("Error", "Failed to load playlists. Please try again.", [
-        { text: "OK" },
-      ]);
+      showAlert("Error", "Failed to load playlists. Please try again.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showAlert]);
+
+  useEffect(() => {
+    if (visible) {
+      loadPlaylists();
+    }
+  }, [visible, loadPlaylists]);
 
   const handleCreateNewPlaylist = () => {
     setShowCreateModal(true);
@@ -74,12 +73,12 @@ export const PlaylistSelectorModal: React.FC<PlaylistSelectorModalProps> = ({
 
   const handleCreatePlaylist = async (name: string) => {
     if (!name.trim()) {
-      Alert.alert("Error", "Please enter a playlist name");
+      showAlert("Error", "Please enter a playlist name");
       return;
     }
 
     if (name.trim().toLowerCase() === "liked songs") {
-      Alert.alert("Error", "This playlist name is reserved");
+      showAlert("Error", "This playlist name is reserved");
       return;
     }
 
@@ -88,7 +87,7 @@ export const PlaylistSelectorModal: React.FC<PlaylistSelectorModalProps> = ({
     );
 
     if (existingPlaylist) {
-      Alert.alert("Error", "A playlist with this name already exists");
+      showAlert("Error", "A playlist with this name already exists");
       return;
     }
 
@@ -121,7 +120,7 @@ export const PlaylistSelectorModal: React.FC<PlaylistSelectorModalProps> = ({
       onClose();
     } catch (error) {
       console.error("Error creating playlist:", error);
-      Alert.alert("Error", "Failed to create playlist. Please try again.");
+      showAlert("Error", "Failed to create playlist. Please try again.");
     } finally {
       setIsCreatingPlaylist(false);
     }
@@ -137,7 +136,7 @@ export const PlaylistSelectorModal: React.FC<PlaylistSelectorModalProps> = ({
       const isTrackInPlaylist = playlist.songs.some((song: any) => song._id === trackId);
 
       if (isTrackInPlaylist) {
-        Alert.alert("Info", "This song is already in the playlist.", [{ text: "OK" }]);
+        showAlert("Info", "This song is already in the playlist.");
         return;
       }
     }

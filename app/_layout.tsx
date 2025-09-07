@@ -1,4 +1,5 @@
 import { colors } from "@/constants/tokens";
+import { DialogProvider } from "@/hooks/useDialog";
 import { useLogTrackPlayerState } from "@/hooks/useLogTrackPlayerState";
 import { useSetupTrackPlayer } from "@/hooks/useSetupTrackPlayer";
 import { useUser } from "@/hooks/useUser";
@@ -6,7 +7,7 @@ import { store, useAppDispatch, useAppSelector } from "@/store/store";
 import { login } from "@/store/userSlice";
 import { SplashScreen, Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React, { useCallback, useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PaperProvider } from "react-native-paper";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -32,8 +33,10 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <GestureHandlerRootView className="flex-1 bg-black">
           <PaperProvider>
-            <RootNavigation />
-            <StatusBar style="light" backgroundColor={colors.background} />
+            <DialogProvider>
+              <RootNavigation />
+              <StatusBar style="light" backgroundColor={colors.background} />
+            </DialogProvider>
           </PaperProvider>
         </GestureHandlerRootView>
       </SafeAreaProvider>

@@ -8,7 +8,7 @@ export const isTrackLiked = (track: Track, userId?: string | number): boolean =>
     return isLikedByUser;
   }
   return track.rating === 1;
-}; 
+};
 
 /**
  * Get the display text for like/unlike action
@@ -35,5 +35,5 @@ export const getLikeErrorMessage = (isLiked: boolean): string => {
  * Get the loading message for like/unlike action
  */
 export const getLikeLoadingMessage = (isLiked: boolean): string => {
-  return isLiked ? "Unliking song..." : "Liking song...";
+  return isLiked ? "Liking song..." : "Unliking song...";
 };
