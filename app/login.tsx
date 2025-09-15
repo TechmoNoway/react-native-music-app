@@ -188,11 +188,8 @@ export default function LoginScreen() {
     setError("");
 
     try {
-      const googleResponse = await googleSignInService.signIn();
+      const googleResponse = await googleSignInService.signInWithAccountPicker();
 
-      console.log("Google Sign In Response:", googleResponse);
-
-      // Send the Google token to your backend for verification
       const response = await axios.post<SocialLoginResponse>(
         `${API_CONFIG.BASE_URL}${API_ENDPOINTS.AUTH.GOOGLE}`,
         {
@@ -225,15 +222,6 @@ export default function LoginScreen() {
           loginMethod: LOGIN_METHODS.GOOGLE,
           loginTime: new Date().toISOString(),
         };
-
-        console.log("=== GOOGLE LOGIN SUCCESS ===");
-        console.log("Full Backend Response:", JSON.stringify(response.data, null, 2));
-        console.log("User Data from Backend:", JSON.stringify(user, null, 2));
-        console.log("Google Response:", JSON.stringify(googleResponse, null, 2));
-        console.log("Final User Data:", JSON.stringify(userData, null, 2));
-        console.log("Auth Token:", token);
-        console.log("Refresh Token:", refreshToken);
-        console.log("===============================");
 
         await storage.setItem(StorageKeys.USER_DATA, userData);
         await storage.setItem(StorageKeys.AUTH_TOKEN, token);

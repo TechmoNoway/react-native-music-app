@@ -16,20 +16,16 @@ class SongsService {
   }
 
   private setupInterceptors() {
-    // Add auth token to requests
     this.apiClient.interceptors.request.use(async (config) => {
       try {
         const token = await storage.getItem(StorageKeys.AUTH_TOKEN);
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
-      } catch {
-        // Silent error handling for auth token
-      }
+      } catch {}
       return config;
     });
 
-    // Handle response errors
     this.apiClient.interceptors.response.use(
       (response) => response,
       (error) => {
@@ -39,7 +35,6 @@ class SongsService {
     );
   }
 
-  // Get all songs
   async getAllSongs(params?: {
     page?: number;
     limit?: number;
@@ -59,10 +54,10 @@ class SongsService {
       });
 
       if (response.data.success) {
-        const songs = response.data.data.songs; // Based on backend response structure
+        const songs = response.data.data.songs;
 
         return {
-          tracks: songs, // Return as tracks for consistency
+          tracks: songs,
           pagination: response.data.pagination,
         };
       }
@@ -74,7 +69,6 @@ class SongsService {
     }
   }
 
-  // Search songs
   async searchSongs(
     query: string,
     params?: {
@@ -97,7 +91,7 @@ class SongsService {
         const songs = response.data.data.songs; // Based on backend response structure
 
         return {
-          tracks: songs, // Return as tracks for consistency
+          tracks: songs,
           total: response.data.data.total || songs.length,
         };
       }
@@ -109,7 +103,6 @@ class SongsService {
     }
   }
 
-  // Get songs by genre
   async getSongsByGenre(
     genre: string,
     params?: {
@@ -128,7 +121,6 @@ class SongsService {
     }
   }
 
-  // Get popular songs
   async getPopularSongs(limit: number = 20): Promise<{ tracks: Track[] }> {
     try {
       return await this.getAllSongs({
@@ -142,7 +134,6 @@ class SongsService {
     }
   }
 
-  // Get song by ID
   async getSongById(id: string): Promise<{ track: Track }> {
     try {
       const response = await this.apiClient.get<{ success: boolean; data: Track }>(
@@ -162,7 +153,6 @@ class SongsService {
     }
   }
 
-  // Update play count
   async updatePlayCount(id: string): Promise<void> {
     try {
       await this.apiClient.post(`/songs/${id}/play`);

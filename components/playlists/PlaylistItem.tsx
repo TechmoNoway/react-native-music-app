@@ -12,6 +12,7 @@ interface PlaylistItemProps {
 
 export const PlaylistItem = ({ playlist, onPress }: PlaylistItemProps) => {
   const isLikedSongs = playlist.name === "Liked Songs";
+  const isRecentlyPlayed = playlist.name === "Recently Played";
 
   return (
     <TouchableHighlight
@@ -24,10 +25,17 @@ export const PlaylistItem = ({ playlist, onPress }: PlaylistItemProps) => {
         <View className="relative mr-4">
           {isLikedSongs ? (
             <LinearGradient
-              colors={["#8B5CF6", "#3B82F6"]} // Purple to Blue gradient
+              colors={["#8B5CF6", "#3B82F6"]}
               className="w-14 h-14 rounded-lg items-center justify-center"
             >
               <Ionicons name="heart" size={24} color="white" />
+            </LinearGradient>
+          ) : isRecentlyPlayed ? (
+            <LinearGradient
+              colors={["#10B981", "#059669"]}
+              className="w-14 h-14 rounded-lg items-center justify-center"
+            >
+              <Ionicons name="time" size={24} color="white" />
             </LinearGradient>
           ) : (
             <Image

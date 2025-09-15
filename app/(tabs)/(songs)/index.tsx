@@ -148,6 +148,7 @@ const SongsScreen = () => {
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search songs..."
+            placeholderTextColor="#666"
             className="flex-1 text-[#666] text-base"
           />
           {searchQuery ? (
@@ -218,8 +219,8 @@ const SongsScreen = () => {
                   {searchQuery
                     ? `Search Results (${filteredSongs.length})`
                     : selectedGenre === "All"
-                    ? `All Songs (${filteredSongs.length})`
-                    : `${selectedGenre} Songs (${filteredSongs.length})`}
+                      ? `All Songs (${filteredSongs.length})`
+                      : `${selectedGenre} Songs (${filteredSongs.length})`}
                 </Text>
                 <TracksList
                   hideQueueControls={true}
@@ -234,8 +235,8 @@ const SongsScreen = () => {
                   {searchQuery
                     ? `No songs found for "${searchQuery}"`
                     : selectedGenre === "All"
-                    ? "No songs available"
-                    : `No ${selectedGenre} songs available`}
+                      ? "No songs available"
+                      : `No ${selectedGenre} songs available`}
                 </Text>
               </View>
             )}

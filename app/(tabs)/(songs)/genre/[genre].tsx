@@ -17,9 +17,7 @@ const GenreScreen = () => {
   const { top, bottom } = useSafeAreaInsets();
   const router = useRouter();
 
-  // Filter tracks by genre (you can implement genre filtering logic here)
   const genreTracks = useMemo(() => {
-    // For now, we'll show all tracks. You can implement genre filtering based on your data structure
     return tracks;
   }, [tracks]);
 

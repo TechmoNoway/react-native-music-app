@@ -22,8 +22,6 @@ export const useArtistsApi = () => {
         "https://nodejs-music-app-backend.vercel.app/api/artists"
       );
 
-      console.log("Response status:", response.status);
-
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }

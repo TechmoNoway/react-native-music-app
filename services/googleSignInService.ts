@@ -33,9 +33,8 @@ class GoogleSignInService {
         scopes: [...GOOGLE_SIGNIN_CONFIG.scopes],
       });
       this.isConfigured = true;
-      console.log("✅ Google Sign In configured successfully");
     } catch (error) {
-      console.error("❌ Google Sign In configuration failed:", error);
+      console.error(error);
       this.isConfigured = false;
     }
   }
@@ -46,17 +45,14 @@ class GoogleSignInService {
         throw new Error("Google Sign In not configured properly");
       }
 
-      // Check if device supports Google Play Services
       await GoogleSignin.hasPlayServices();
 
-      // Sign in
       const userInfo = await GoogleSignin.signIn();
 
       if (!userInfo.data?.user?.email) {
         throw new Error("No user information received from Google");
       }
 
-      // Get tokens
       const tokens = await GoogleSignin.getTokens();
 
       const result: GoogleSignInResult = {
@@ -140,7 +136,54 @@ class GoogleSignInService {
       return false;
     }
   }
+
+  async signInWithAccountPicker(): Promise<GoogleSignInResult> {
+    try {
+      const isCurrentlySignedIn = await this.isSignedIn();
+      if (isCurrentlySignedIn) {
+        await this.signOut();
+        console.log("🔄 Logged out current account to show account picker");
+      }
+
+      await GoogleSignin.hasPlayServices();
+
+      const userInfo = await GoogleSignin.signIn();
+
+      if (!userInfo.data?.user?.email) {
+        throw new Error("No user information received from Google");
+      }
+
+      const tokens = await GoogleSignin.getTokens();
+
+      const result: GoogleSignInResult = {
+        user: {
+          id: userInfo.data.user.id,
+          name: userInfo.data.user.name,
+          email: userInfo.data.user.email,
+          photo: userInfo.data.user.photo,
+          familyName: userInfo.data.user.familyName,
+          givenName: userInfo.data.user.givenName,
+        },
+        idToken: tokens.idToken,
+        accessToken: tokens.accessToken,
+      };
+
+      console.log("✅ Login successful with account picker:", result.user.email);
+      return result;
+    } catch (error: any) {
+      console.error("❌ Login with account picker failed:", error);
+
+      if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
+        throw new Error("Login was cancelled");
+      } else if (error?.code === statusCodes.IN_PROGRESS) {
+        throw new Error("Login is in progress");
+      } else if (error?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        throw new Error("Google Play Services is not available");
+      }
+
+      throw error;
+    }
+  }
 }
 
-// Export singleton instance
 export const googleSignInService = new GoogleSignInService();

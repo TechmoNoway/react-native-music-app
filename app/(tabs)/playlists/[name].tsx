@@ -2,7 +2,9 @@ import { AddToPlaylistModal } from "@/components/playlists/AddToPlaylistModal";
 import { PlaylistTracksList } from "@/components/playlists/PlaylistTracksList";
 import { colors, fontSize } from "@/constants/tokens";
 import { convertApiPlaylistToPlaylist } from "@/helpers/types";
+import { useDialog } from "@/hooks/useDialog";
 import AudioService from "@/services/audioService";
+import { downloadService } from "@/services/downloadService";
 import { playlistService } from "@/services/playlistService";
 import { useApiPlaylists, usePlaylists } from "@/store/hooks";
 import { PlaylistApiResponse } from "@/types/api";
@@ -13,7 +15,6 @@ import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -79,6 +80,7 @@ const getPlaylistGradient = (
 const PlaylistScreen = () => {
   const { name: playlistName } = useLocalSearchParams<{ name: string }>();
   const { top } = useSafeAreaInsets();
+  const { showAlert } = useDialog();
   const [isScrolled, setIsScrolled] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showAddSongsModal, setShowAddSongsModal] = useState(false);
@@ -89,6 +91,7 @@ const PlaylistScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0); // Force re-render key
+  const [isDownloading, setIsDownloading] = useState(false); // Add download state
   const router = useRouter();
 
   const { playlists } = usePlaylists();
@@ -222,10 +225,7 @@ const PlaylistScreen = () => {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (permissionResult.granted === false) {
-        Alert.alert(
-          "Permission Required",
-          "Permission to access camera roll is required!"
-        );
+        showAlert("Permission Required", "Permission to access camera roll is required!");
         return;
       }
 
@@ -242,18 +242,18 @@ const PlaylistScreen = () => {
       }
     } catch (error) {
       console.error("Error picking image:", error);
-      Alert.alert("Error", "Failed to pick image");
+      showAlert("Error", "Failed to pick image");
     }
   };
 
   const handleSaveEdit = async () => {
     if (!editName.trim()) {
-      Alert.alert("Error", "Please enter a playlist name");
+      showAlert("Error", "Please enter a playlist name");
       return;
     }
 
     if (!apiPlaylist?._id) {
-      Alert.alert("Error", "Playlist not found");
+      showAlert("Error", "Playlist not found");
       return;
     }
 
@@ -265,7 +265,7 @@ const PlaylistScreen = () => {
         );
 
         if (existingPlaylist) {
-          Alert.alert("Error", "A playlist with this name already exists");
+          showAlert("Error", "A playlist with this name already exists");
           return;
         }
       }
@@ -296,7 +296,7 @@ const PlaylistScreen = () => {
         router.replace(`/(tabs)/playlists/${editName.trim()}`);
       }
     } catch {
-      Alert.alert("Error", "Failed to update playlist. Please try again.");
+      showAlert("Error", "Failed to update playlist. Please try again.");
     }
   };
 
@@ -309,39 +309,35 @@ const PlaylistScreen = () => {
 
   const handleDeletePlaylist = () => {
     if (playlist.isDefault) {
-      Alert.alert("Cannot Delete", "This playlist cannot be deleted");
+      showAlert("Cannot Delete", "This playlist cannot be deleted");
       return;
     }
 
     if (!apiPlaylist?._id) {
-      Alert.alert("Error", "Playlist not found");
+      showAlert("Error", "Playlist not found");
       return;
     }
 
-    Alert.alert(
-      "Delete Playlist",
-      `Are you sure you want to delete "${playlist.name}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteApiPlaylist(apiPlaylist._id);
-              router.back();
-            } catch {
-              Alert.alert("Error", "Failed to delete playlist. Please try again.");
-            }
-          },
+    showAlert("Delete Playlist", `Are you sure you want to delete "${playlist.name}"?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteApiPlaylist(apiPlaylist._id);
+            router.back();
+          } catch {
+            showAlert("Error", "Failed to delete playlist. Please try again.");
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handlePlayPlaylist = async () => {
     if (playlist.tracks.length === 0) {
-      Alert.alert("Playlist Empty", "Add some songs to play this playlist");
+      showAlert("Playlist Empty", "Add some songs to play this playlist");
       return;
     }
 
@@ -350,13 +346,13 @@ const PlaylistScreen = () => {
       await AudioService.playFromQueue(0, false);
     } catch (error) {
       console.error("Error playing playlist:", error);
-      Alert.alert("Error", "Failed to play playlist");
+      showAlert("Error", "Failed to play playlist");
     }
   };
 
   const handleShufflePlaylist = async () => {
     if (playlist.tracks.length === 0) {
-      Alert.alert("Playlist Empty", "Add some songs to shuffle this playlist");
+      showAlert("Playlist Empty", "Add some songs to shuffle this playlist");
       return;
     }
 
@@ -365,8 +361,57 @@ const PlaylistScreen = () => {
       await AudioService.playFromQueue(0, true);
     } catch (error) {
       console.error("Error shuffling playlist:", error);
-      Alert.alert("Error", "Failed to shuffle playlist");
+      showAlert("Error", "Failed to shuffle playlist");
     }
+  };
+
+  // Add download playlist function
+  const handleDownloadPlaylist = async () => {
+    if (playlist.tracks.length === 0) {
+      showAlert("Playlist Empty", "Add some songs to download this playlist");
+      return;
+    }
+
+    showAlert(
+      "Download Playlist",
+      `Download "${playlist.name}" (${playlist.tracks.length} songs) for offline listening?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Download",
+          onPress: async () => {
+            setIsDownloading(true);
+            try {
+              const result = await downloadService.downloadPlaylist(
+                playlist,
+                (progress) => {
+                  console.log(
+                    `Downloading: ${progress.trackTitle} - ${Math.round(progress.progress * 100)}%`
+                  );
+                }
+              );
+
+              if (result.failedTracks.length === 0) {
+                showAlert(
+                  "Success",
+                  `Playlist "${playlist.name}" downloaded successfully! (${result.downloadedTracks.length} songs)`
+                );
+              } else {
+                showAlert(
+                  "Partial Success",
+                  `Downloaded ${result.downloadedTracks.length} of ${playlist.tracks.length} songs. ${result.failedTracks.length} tracks failed.`
+                );
+              }
+            } catch (error) {
+              console.error("Error downloading playlist:", error);
+              showAlert("Error", "Failed to download playlist. Please try again.");
+            } finally {
+              setIsDownloading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const gradientColors = getPlaylistGradient(
@@ -485,7 +530,7 @@ const PlaylistScreen = () => {
               {apiPlaylist?.coverImageUrl ? (
                 <Image
                   source={{
-                    uri: `${apiPlaylist.coverImageUrl}?t=${Date.now()}&r=${refreshKey}`, // Add timestamp and refresh key
+                    uri: `${apiPlaylist.coverImageUrl}?t=${Date.now()}&r=${refreshKey}`,
                   }}
                   style={{
                     width: 232,
@@ -541,7 +586,7 @@ const PlaylistScreen = () => {
             </Text>
 
             {/* Creator and Song Count */}
-            <View
+            {/* <View
               style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}
             >
               <View
@@ -566,7 +611,7 @@ const PlaylistScreen = () => {
               >
                 Techmo
               </Text>
-            </View>
+            </View> */}
 
             <Text
               style={{
@@ -580,15 +625,21 @@ const PlaylistScreen = () => {
 
             {/* Controls Row */}
             {playlist.tracks.length > 0 ? (
-              /* Download and Controls Row for playlists with songs */
               <View className="flex-row items-center justify-between mb-6">
                 <View className="flex-row items-center gap-4">
-                  <TouchableOpacity>
-                    <Ionicons
-                      name="download-outline"
-                      size={24}
-                      color="rgba(255,255,255,0.7)"
-                    />
+                  <TouchableOpacity
+                    onPress={handleDownloadPlaylist}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? (
+                      <ActivityIndicator size="small" color="rgba(255,255,255,0.7)" />
+                    ) : (
+                      <Ionicons
+                        name="download-outline"
+                        size={24}
+                        color="rgba(255,255,255,0.7)"
+                      />
+                    )}
                   </TouchableOpacity>
 
                   {!playlist.isDefault && (
@@ -623,7 +674,6 @@ const PlaylistScreen = () => {
                 </View>
               </View>
             ) : (
-              /* Controls for empty playlists */
               !playlist.isDefault && (
                 <View className="flex-row items-center justify-between mb-6">
                   <View className="flex-row items-center gap-4">

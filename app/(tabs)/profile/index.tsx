@@ -201,8 +201,8 @@ export default function ProfileScreen() {
                     source={{ uri: profileData?.avatar || user?.avatar }}
                     style={{ width: 150, height: 150 }}
                     resizeMode="cover"
-                    onLoad={() => console.log("Avatar loaded successfully")}
-                    onError={(error) => console.log("Avatar load error:", error)}
+                    // onLoad={() => console.log("Avatar loaded successfully")}
+                    // onError={(error) => console.log("Avatar load error:", error)}
                   />
                 ) : (
                   <View
